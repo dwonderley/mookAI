@@ -11,6 +11,7 @@ export class MookAI
 {
 	constructor ()
 	{
+		this._busy = true;
 		this._combats = new Map ();
 	}
 
@@ -27,7 +28,6 @@ export class MookAI
 		}
 
 		mookAI = new MookAI ();
-		game.combats.forEach (c => { mookAI.combatStart (c); });
 
 		Hooks.on ("updateToken", (scene_, token_, changes_, diff_, sceneID_) => {
 			if (! diff_)
@@ -48,35 +48,37 @@ export class MookAI
 		Hooks.on ("deleteCombat", (combat_, obj_, id_) => {
 			mookAI.combatEnd (combat_);
 		});
+		Hooks.on ("updateScene", (...args) => { mookAI.handleSceneChange () });
 
-		// todo: remove before uploading
 		document.addEventListener('keyup', evt => {
-			if (evt.key === 'h')
-				printStuff ();
-		});
+			if (evt.key !== 'b' || mookAI.busy)
+				return;
 
-		// todo: remove before uploading
-		document.addEventListener('keyup', evt => {
-			if (evt.key === 't')
-				testStuff ();
+			game.combat.previousTurn ();
 		});
 
 		document.addEventListener('keyup', evt => {
-			if (evt.key === 'b')
-				game.combat.previousTurn ();
+			if (evt.key !== 'n' || mookAI.busy)
+				return;
+
+			game.combat.nextTurn ();
 		});
 
 		document.addEventListener('keyup', evt => {
-			if (evt.key === 'n')
-				game.combat.nextTurn ();
+			if (evt.key !== 'g' || mookAI.busy)
+				return;
+
+			mookAI.takeTurn ();
 		});
 
-		document.addEventListener('keyup', evt => {
-			if (evt.key === 'g')
-				mookAI.takeTurn ();
-		});
+		mookAI._busy = false;
 	}
 
+	handleSceneChange ()
+	{
+		this._combats = new Map ();
+		this._busy = false;
+	}
 	
 	addCombatant (combat_, id_)
 	{
@@ -88,8 +90,27 @@ export class MookAI
 		this.combats.get (combat_.id).delete (id_);
 	}
 
+	// Throws if there are no combats in the active scene
+	async startCombats ()
+	{
+		game.combats.combats.forEach (c => { mookAI.combatStart (c); });
+
+		if (this._combats.size === 0)
+		{
+			ui.notifications.warn ("No combats in active scene.");
+			throw "No combats in active scene";
+		}
+
+		// Work around for FVTT bug. game.combat.current is null when a scene is loaded
+		await game.combat.previousTurn ();
+		await game.combat.nextTurn ();
+	}
+
 	combatStart (combat_)
 	{
+		if (combat_.data.scene !== game.scenes.active.id)
+			return;
+
 		if (this.combats.get (combat_.id))
 		{
 			console.log ("mookAI | Attempted to start combat that is already active.");
@@ -99,7 +120,12 @@ export class MookAI
 		let newMooks = new Map ();
 
 		combat_.combatants.forEach (element => {
-			newMooks.set (element.tokenId, new Mook (canvas.tokens.get (element.tokenId)));
+			const newToken = canvas.tokens.get (element.tokenId);
+
+			if (! newToken)
+			    return;
+
+			newMooks.set (element.tokenId, new Mook (newToken));
 		});
 
 		this._combats.set (combat_.id, newMooks);
@@ -123,24 +149,54 @@ export class MookAI
 		});
 	}
 
-	getMook (id_) { return this.combats.get (game.combat.id).get (id_); }
+	getMook (id_)
+	{
+		const combat = this.combats.get (game.combat.id);
+
+		if (! combat)
+			return undefined;
+
+		return combat.get (id_);
+	}
 
 	async takeTurn ()
 	{
-		const mook = this.getMook (game.combat.current.tokenId);
-
-		if (mook.isPC ())
+		try
 		{
-			console.log ("mookAI | Not taking turn for player character.");
-			return;
-		}
+			// Throws if there is not combat on the *active* scene
+			if (mookAI._combats.size === 0)
+				await mookAI.startCombats ();
 
-		mook.startTurn ();
-		mook.sense ();
-		mook.planTurn ();
-		await mook.act ();
-		mook.releaseControl ();
-		this.endTurn ();
+			const mook = this.getMook (game.combat.current.tokenId);
+	
+			if (! mook)
+			{
+				ui.notifications.warn ("mookAI | Mook not found. Are you viewing the active scene?");
+				throw "Failed to find mook " + game.combat.current.tokenId + " in scene " + game.scenes.active.id;
+			}
+	
+			if (mook.isPC ())
+			{
+				console.log ("mookAI | Not taking turn for player character");
+				return;
+			}
+	
+			this._busy = true;
+	
+			mook.startTurn ();
+			mook.sense ();
+			mook.planTurn ();
+			await mook.act ();
+			mook.releaseControl ();
+			this.endTurn ();
+	
+			this._busy = false;
+		}
+		catch (e)
+		{
+			console.error ("mookAI | Encountered unrecoverable error: ");
+			console.error (e);
+		}
 	}
 
 	updateTokens (changes_)
@@ -150,18 +206,8 @@ export class MookAI
 		});
 	}
 
+	// ;)
+	get busy () { return this._busy; }
+
 	get combats () { return this._combats; }
 };
-
-function testStuff ()
-{
-	const tokens = canvas.tokens.placeables.filter (e => { return e.name === "Actual PC"; })
-	const girsula = mookAI.getMook (tokens[0].id);
-	girsula.step ();
-}
-
-function printStuff ()
-{
-	const token = canvas.tokens.placeables.filter (e => { return e.name === "Actual PC"; });
-	console.log (token[0].x, token[0].y);
-}

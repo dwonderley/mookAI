@@ -1,5 +1,4 @@
 // todo: support hex. Most of this should work with hex, but not all
-
 const MinkowskiParameter =
 {
 	Manhattan: 1,
@@ -55,8 +54,13 @@ export class Point
 		this._y = y_;
 		// todo: Could represent difficult terrain, elevation, tile type (square/hex)...
 		this.val = val_;
-		// D&D uses the Chebyshev norm (adjacent + diagonals)
-		this._metric = MinkowskiParameter.Chebyshev;
+
+		switch (game.system.id)
+		{
+		// D&D 5E uses the Chebyshev norm (adjacent + diagonals)
+		case ("dnd5e"):
+			this._metric = MinkowskiParameter.Chebyshev;
+		}
 	}
 
 	distToPoint (p_)     { return Point.lp (this, p_, this.metric); }
@@ -72,8 +76,19 @@ export class Point
 		const dx = - Math.sin (theta);
 		const dy = Math.cos (theta);
 
-		return getPointFromCoord (Math.round (this.x + dx),
-					  Math.round (this.y + dy));
+		if (this.metric === MinkowskiParameter.Chebyshev)
+			return getPointFromCoord (Math.round (this.x + dx), Math.round (this.y + dy));
+
+		// Otherwise, the token can only move adjacently. This means that it can only change either the x or y
+		// coordinate. We will have it take the bigger movement
+
+		const adx = Math.abs (dx);
+		const ady = Math.abs (dy);
+
+		if (adx > ady || (adx === ady && Math.random () > 0.5))
+			return getPointFromCoord (this.x + Math.sign(dx), this.y);
+
+		return getPointFromCoord (this.x, this.y + Math.sign(dy));
 	}
 
 	// Gets all of this point's neighbors
