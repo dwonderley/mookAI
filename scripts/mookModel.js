@@ -17,7 +17,7 @@ This module does not free the GM of responsibility of combat outcomes. Like any
 tool, its usage is at the discretion of the practitioner.
 
 The goal for this class is to implement different subclasses for systems other than DnD5e. This process is relatively simple, as only few methods need to be overridden, as demonstrated by MookModel5e below.
-If this is done, the module should be able to support those systems without additional changes since everything "above" it has been designed to be system-agnostic. The only other change is that the system name must be added to the getMookModel static function below.
+If this is done, the module should be able to support those systems without additional changes since everything "above" it has been designed to be system-agnostic. The two exceptions are that the system name must be added to the getMookModel static function below and the distance metric type must be added to the Point class' constructor.
 At the moment, I am prioritizing functionality and bug fixes and have no plans to support other systems. However, if you want to implement a MookModel for the system you play, I will be happy to work with you and to review and merge in your code
 */
 import { MookModelSettings, MookInitiative  } from "./mookModelSettings.js"
@@ -59,7 +59,8 @@ export class MookModel
 	{
 		this.settings = new MookModelSettings (token_);
 
-		this._hasSight = token_.hasSight;
+		this._token = token_;
+
 		// Override these in system extensions
 		this._hasMele = false;
 		this._hasRanged = false;
@@ -76,7 +77,7 @@ export class MookModel
 		return null;
 	}
 
-	// Do not override
+	// Do not override these
 	haltAction () { return { actionType: ActionType.HALT, cost: 0 }; }
 	stepAction () { return { actionType: ActionType.STEP, cost: 1 }; }
 	planAction () { return { actionType: ActionType.PLAN, cost: 0 }; }
@@ -126,19 +127,25 @@ export class MookModel
 	{
 		return { actionType: ActionType.RANGED_ATTACK, data: this.rangedWeapon };
 	}
+	zoom () { return this.time; }
 
 	// Subclasses MUST override
 	// action_ is either a MELE_ATTACK or a RANGED_ATTACK
 	async attack (action_) { throw "Game system not supported" };
+	// Reset the mook model's resources for use
+	startTurn () {};
 
 	// Do not override
 	get gridDistance () { return game.scenes.active.data.gridDistance; }
-	get hasMele () { return this.settings.useMele && this._hasMele }
-	get hasRanged () { return this.settings.useRanged && this._hasRanged }
-	get hasVision () { return this.settings.useSight && this._hasSight }
-	get planningStrategy () { return this.settings.planningStrategy; }
+	get hasMele () { return this.settings.useMele && this._hasMele; }
+	get hasRanged () { return this.settings.useRanged && this._hasRanged; }
+	get hasSight () { return this.token.hasSight; }
+	get hasVision () { return this.settings.useSight && this.hasSight; }
+	get token () { return this._token; }
 
 	// Maybe override?
+	// Can the token do something to increase its movement range? This can be called multiple times, so if you override this, track resources.
+	get canZoom () { false; }
 	// todo: Advanced weapon selection
 	get meleWeapon () { return this.hasMele ? this._meleWeapons[0] : null; }
 	get rangedWeapon () { return this.hasRanged ? this._rangedWeapons[0] : null; }
@@ -164,6 +171,9 @@ class MookModel5e extends MookModel
 		});
 		this._hasMele = this._meleWeapons.length > 0;
 		this._hasRanged = this._rangedWeapons.length > 0;
+
+		this.hasDashAction = true;
+		this.usedDashAction = false;
 	}
 
 	// action_ is either a MELE_ATTACK or a RANGED_ATTACK
@@ -189,6 +199,18 @@ class MookModel5e extends MookModel
 		}
 	}
 
+	startTurn ()
+	{
+		this.usedDashAction = false;
+	}
+
+	zoom ()
+	{
+		this.usedDashAction = true;
+		return this.time;
+	}
+
+	get canZoom () { return this.hasDashAction && ! this.usedDashAction; }
 	get meleRange ()
 	{
 		const dist = this.meleWeapon.data.data?.range?.value;

@@ -1,6 +1,7 @@
-import { Point, getPoint, getPointFromToken, Neighbors, deg2rad, rad2deg } from "./point.js";
+import { Behaviors, MookTypes, Target } from "./behaviors.js"
 import { ActionType, MookModel } from "./mookModel.js";
-//import { Paths } from "./planning/paths.js";
+import { Path, PathManager, isTraversable } from "./planning/pathManager.js";
+import { Point, getPoint, getPointFromToken, Neighbors, rad2deg } from "./point.js";
 
 // Wrapper around FVTT token class
 export class Mook
@@ -17,21 +18,24 @@ export class Mook
 		this._time = this.mookModel.time;
 		// Array of Actions
 		this._plan = new Array ();
-		//this._paths = new Paths (this._mookModel.planningStrategy);
+		// Manages the mook's attempts at path planning
+		this._pathManager = new PathManager (this._mookModel);
 	}
 
 	startTurn ()
 	{
 		// Need to take control in order to check token's vision
 		this.takeControl ();
+		this.mookModel.startTurn ();
 
 		this.time = this.mookModel.time;
 		this._visibleTargets.splice (0);
 	}
 
-	sense ()
+	async sense ()
 	{
-		//this.paths.clear ();
+		this.pathManager.clear ();
+		this.pathManager.origin = this.point;
 
 		this._visibleTargets = game.combat.combatants.filter (combatant => {
 			// Even mooks won't target themselves on purpose
@@ -44,12 +48,14 @@ export class Mook
 			// This shouldn't be possible
 			if (! token.inCombat) return false;
 			// If the mook doesn't have vision, then it can see everyone. This choice avoids many problems.
-			if (! this.mookModel.hasVision) return true;
+			if (this.mookModel.hasVision && ! this.canSee (token.id)) return false;
 
-			//this.paths.addToken (token);
-
-			return this.canSee (token.id);
+			return true;
 		}).map (c => { return canvas.tokens.get (c.tokenId); });
+
+		// Todo: compute paths between tokens when one moves and then select paths here. 
+		for (let t of this.visibleTargets)
+			await this.pathManager.addToken (this.token, t, this.time);
 	}
 
 	planTurn ()
@@ -59,97 +65,71 @@ export class Mook
 
 		if (this.visibleTargets.length === 0)
 		{
-			console.log ("No visible targets");
-
 			this.mookModel.exploreActions ().forEach (a => {
 				this.plan.push (a);
 			});
-			// todo: combine these?
 			this.plan.push (this.mookModel.senseAction ());
 			this.plan.push (this.mookModel.planAction ());
 			return;
 		}
 
-		const target = this.determineTarget ();
-		console.log ("Target is: ");
-		console.log (target);
+		const targets = this.viableTargets;
 
-		// If the mook can get into mele range, they will go for a mele attack
-		// todo: Add range preference?
-		if (this.mookModel.hasMele && this.isTargetReachable (target, this.mookModel.meleRange))
+		if (targets === null)
 		{
-			// todo: Replace with path path planning when I figure out how to do collision
-			// The "origin" of an attack with 0 range is the target's location, itself
-			let attackOrigin = getPointFromToken (target);
-
-			// For each unit of range, the mook can be one time-unit further away from the target.
-			// The process below finds the tile closest to the mook that is in range of the target.
-			for (let i = 0; i < this.mookModel.meleRange; ++i)
+			// todo: move resources such as number of attacks/actions to mook model
+			/* todo: this may be inconsistent with above. Mooks don't zoom if there are no targets, but they do if there's one out of range? What if there's a target in range that they can't see yet? Should they explore before zooming? In 5e, probably, but does that hold for other systems?
+			if (this.mookModel.canZoom)
 			{
-				// Mooks don't kite
-				// todo: Add mook model setting to let mooks kite?
-				if (this.point.equals (attackOrigin))
-					break;
+				this.time += this.mookModel.zoom ();
 
-				attackOrigin = this.point.closestNeighborOfToken (attackOrigin, this.rotation);
-			}
+				// todo: dash actions and the like
+				this.plan.push (this.mookModel.senseAction ());
+				this.plan.push (this.mookModel.planAction ());
+				return;
+			} */
 
-			this.plan.push ({
-				actionType: ActionType.TARGET,
-				data: { "target": target, "state": true },
-			});
-
-			if (! this.point.equals (attackOrigin))
-				this.plan.push ({
-					actionType: ActionType.MOVE,
-					cost: this.distToPoint (attackOrigin),
-					data: attackOrigin,
-				});
-
-			this.plan.push (this.mookModel.faceAction (target));
-
-			this.plan.push (this.mookModel.meleAttackAction ());
-
-			this.plan.push ({
-				actionType: ActionType.TARGET,
-				data: { "target": target, "state": false },
-			});
-		}
-		else if (this.mookModel.hasRanged && this.isTargetReachable (target, this.mookModel.rangedRange))
-		{
-			console.log ("Ranged Rage!");
-
-			this.plan.push ({
-				actionType: ActionType.TARGET,
-				data: { "target": target, "state": true }
-			});
-
-			// We know that this value is <= the mook's remaining time because it was checked above
-			let distFromMaxRange = this.distToToken (target) - this.mookModel.rangedRange;
-
-			while (distFromMaxRange-- > 0)
-			{
-				this.plan.push (this.mookModel.faceAction (target));
-				this.plan.push (this.mookModel.stepAction ());
-			}
-
-			this.plan.push (this.mookModel.faceAction (target));
-			this.plan.push (this.mookModel.rangedAttackAction ());
-
-			this.plan.push ({
-				actionType: ActionType.TARGET,
-				data: { "target": target, "state": false },
-			});
-		}
-		else
-		{
-			// If a mook cannot attack anyone, they will explore to try to find someone closer
+			// If a mook can't find a target, they will explore to try to find one
 			this.mookModel.exploreActions ().forEach (a => {
 				this.plan.push (a);
 			});
 			this.plan.push (this.mookModel.senseAction ());
 			this.plan.push (this.mookModel.planAction ());
+			return;
 		}
+
+		// Of type Target
+		const target = Behaviors.chooseTarget(this, targets);
+
+		console.log ("Target is: ");
+		console.log (target);
+
+		this.plan.push ({
+			actionType: ActionType.TARGET,
+			data: { "target": target.token, "state": true },
+		});
+
+		this.pathManager.path (target.id).within (target.range).forEach (p => {
+			if (p === this.point)
+				return;
+
+			this.plan.push ({
+				actionType: ActionType.MOVE,
+				cost: 1,
+				data: p,
+			});
+		});
+
+		this.plan.push (this.mookModel.faceAction (target.token));
+
+		this.plan.push (target.attackAction);
+
+		this.plan.push ({
+			actionType: ActionType.TARGET,
+			data: { "target": target.token, "state": false },
+		});
+
+		// let distFromMaxRange = this.distToToken (target) - this.mookModel.rangedRange;
 
 		this.plan.push (this.mookModel.haltAction ());
 	}
@@ -183,7 +163,7 @@ export class Mook
 				return;
 			case (ActionType.SENSE):
 				console.log ("Sensing");
-				this.sense ();
+				await this.sense ();
 				break;
 			case (ActionType.PLAN):
 				console.log ("Planning");
@@ -284,16 +264,26 @@ export class Mook
 		await new Promise (resolve => setTimeout (resolve, 500));
 	}
 
-	// There are many ways to pick a target, implemented below. The mook model chooses which one. Note that
-	// choosing a target is done indepentently of the path planning. The two alternate, if necessary.
-	// 1. Closest visible target (do not change targets)
-	// 2. todo: Closest visible target on path (change targets while moving if they find a closer one).
-	// 3. todo: Victimize (attack weakest PC)
-	// 4. todo: Pack tactics (attack focused PC)
-	determineTarget ()
+	get viableTargets ()
 	{
-		// todo: && this.paths.hasPath (token.id);
+		let meleTargets = null;
+		let rangedTargets = null;
 
+		if (this.mookModel.hasMele)
+			meleTargets = this.visibleTargets.filter (e => {
+				return this.isTargetReachable (e, this.mookModel.meleRange)
+			});
+
+		if (this.mookModel.hasRanged)
+			rangedTargets = this.visibleTargets.filter (e => {
+				return this.isTargetReachable (e, this.mookModel.rangedRange)
+			});
+
+		if (! meleTargets && ! rangedTargets)
+			return null;
+
+		return { "mele": meleTargets, "ranged": rangedTargets };
+		/*
 		// Gets the nearest target
 		let maxDist = Infinity;
 		let maxRDist = Math.PI;
@@ -313,10 +303,11 @@ export class Mook
 		}
 
 		return target;
+		*/
 	}
 
 	/**
-	 * @param {token} target_
+	 * @param {Token} target_
 	**/
 	degreesToTarget (target_)
 	{
@@ -326,6 +317,9 @@ export class Mook
 
 	async move (point_)
 	{
+		if (! isTraversable (this.point, point_))
+			return;
+
 		this.point = point_;
 		await this.token.update ({ x: point_.px, y: point_.py }).catch (err => {
 			ui.notifications.warn (err);
@@ -342,7 +336,7 @@ export class Mook
 
 	isTargetReachable (target_, attackRange_)
 	{
-		return (this.time + attackRange_) >= this.distToToken (target_);
+		return this.pathManager.path (target_.id).terminalDistanceToDest <= attackRange_;
 	}
 
 	releaseControl () { this.token.release ({}); }
@@ -355,7 +349,7 @@ export class Mook
 
 	get mookModel () { return this._mookModel; } 
 
-	//get paths () { return this._paths; }
+	get pathManager () { return this._pathManager; } 
 
 	get plan () { return this._plan; }
 

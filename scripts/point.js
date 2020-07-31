@@ -58,6 +58,7 @@ export class Point
 		switch (game.system.id)
 		{
 		// D&D 5E uses the Chebyshev norm (adjacent + diagonals)
+		// todo: global setting
 		case ("dnd5e"):
 			this._metric = MinkowskiParameter.Chebyshev;
 		}
@@ -218,6 +219,9 @@ export class Point
 	// x and y offset, in pixels
 	get px () { return this.x * this.scale; }
 	get py () { return this.y * this.scale; }
+	// x and y center offset, in pixels
+	get cpx () { return (this.x + 0.5) * this.scale; }
+	get cpy () { return (this.y + 0.5) * this.scale; }
 
 	get scale () { return canvas.grid.size; }
 

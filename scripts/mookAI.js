@@ -184,7 +184,7 @@ export class MookAI
 			this._busy = true;
 	
 			mook.startTurn ();
-			mook.sense ();
+			await mook.sense ();
 			mook.planTurn ();
 			await mook.act ();
 			mook.releaseControl ();
