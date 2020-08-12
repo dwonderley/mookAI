@@ -1,4 +1,4 @@
-import { getPointFromToken, Point } from "./point.js";
+import { getPointFromToken, Point } from "./planning/point.js";
 
 // If you want me to remove your name from here, message me, and I'll do it :)
 export const MookTypes =
@@ -65,20 +65,21 @@ export class Behaviors
 	}
 	static attackClosest (mook_, targets_)
 	{
-		const mookModel = mook_.mookModel;
-		if (mookModel.hasMele && targets_.mele.length > 0)
+		const mm = mook_.mookModel;
+
+		if (mm.hasMele && targets_.mele.length > 0)
 		{
-			const token = Behaviors.getSmallest (targets_.mele, e => {
-				return Point.Euclidean (mook_.point, getPointFromToken (e));
+			const token = Behaviors.getSmallest (targets_.mele, t => {
+				return mook_.pathManager.path (t.id)?.cost;
 			});
-			return new Target (token, mook_.mookModel.meleRange, mook_.mookModel.meleAttackAction ());
+			return new Target (token, mm.meleRange, mm.meleAttackAction ());
 		}
-		else if (mookModel.hasRanged && targets_.ranged.length > 0)
+		else if (mm.hasRanged && targets_.ranged.length > 0)
 		{
-			const token = Behaviors.getSmallest (targets_.ranged, e => {
-				return Point.Euclidean (mook_.point, getPointFromToken (e));
+			const token = Behaviors.getSmallest (targets_.ranged, t => {
+				return mook_.pathManager.path (t.id)?.cost;
 			});
-			return new Target (token, mook_.mookModel.rangedRange, mook_.mookModel.rangedAttackAction ());
+			return new Target (token, mm.rangedRange, mm.rangedAttackAction ());
 		}
 
 		return null;

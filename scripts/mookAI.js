@@ -194,8 +194,9 @@ export class MookAI
 		}
 		catch (e)
 		{
-			console.error ("mookAI | Encountered unrecoverable error: ");
+			console.error ("mookAI | Encountered unrecoverable error:");
 			console.error (e);
+			this._busy = false;
 		}
 	}
 

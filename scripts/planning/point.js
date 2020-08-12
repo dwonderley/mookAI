@@ -1,4 +1,6 @@
-// todo: support hex. Most of this should work with hex, but not all
+// todo: support hex
+
+// The types of distance norms typical in tile-based games
 const MinkowskiParameter =
 {
 	Manhattan: 1,
@@ -19,21 +21,55 @@ export const Neighbors =
 	fLeft: 315,
 }
 
-// Returns a new Point from the x and y offsets from the top-left corner, in pixels
+export const AngleTypes =
+{
+	RAD: 0,
+	DEG: 1,
+}
+
+export function getTokenWidth (token_)
+{
+	const scale = canvas.grid.size;
+
+	let width = Math.floor (token_.w / scale);
+	return width ? width : 1;
+}
+
+export function getTokenHeight (token_)
+{
+	const scale = canvas.grid.size;
+
+	const height = Math.floor (token_.h / scale);
+	return height ? height : 1;
+}
+
+// Returns a new Point from px and py offsets: top left corner of canvas to top left corner of tile, in pixels
 export function getPoint (px_, py_)
 {
 	if (px_ < 0 || py_ < 0) return undefined;
 
-	const size = canvas.grid.size;
-	return new Point (px_ / size, py_ / size, 0);
+	const scale = canvas.grid.size;
+	return new Point (px_ / scale, py_ / scale, 0);
 }
 
-// Returns a new Point from the x and y offsets from the top-left corner, in grid squares
+// Returns a new Point from x and y offsets: top left corner of canvas to top left corner of tile, in grid squares
 export function getPointFromCoord (x_, y_)
 {
 	if (x_ < 0 || y_ < 0) return undefined;
 
 	return new Point (x_, y_, 0);
+}
+
+// A token with dimensions > 1x1 is represented by an array of points for the purposes of los, collision detection, and path planning. The top left point *must* be the first element of the array.
+export function getPointSetFromCoord (x_, y_, w_, h_)
+{
+	let ret = new Array ();
+
+	for (let i = 0; i < w_; ++i)
+		for (let j = 0; j < h_; ++j)
+			ret.push (getPointFromCoord (x_ + i, y_ + j));
+
+	return ret;
 }
 
 // Returns a new Point using a token's position
@@ -42,16 +78,26 @@ export function getPointFromToken (token_)
 	return getPoint (token_.x, token_.y);
 }
 
+export function getPointSetFromToken (token_)
+{
+	const origin = getPointFromToken (token_);
+
+	return getPointSetFromCoord (origin.x, origin.y, getTokenWidth (token_), getTokenHeight (token_));
+}
+
+// Returns a new Point located at the center of... this point. 
+export function getCenterPointFromToken (token_) { return getPoint (token_.x + token_.w / 2, token_.y + token_.h / 2); }
+
 // Represents a token's position as a point in grid-space rather than pixel-space and provides some useful methods.
-// todo: why am I using the top-left corner rather than the center? Using the center would remove some of the special cases such as rotateToCenter and many problems related to token size. There's nothing *wrong* with using all non-integer points in JS, as they are all floats!
-// Why do this class have a random val_ member that isn't used anywhere? I'm not sure; I just have a feeling it will be
-// valuable at some point.
+// Why does this class have a random val_ member that isn't used anywhere? I'm not sure, but I just have a feeling it will be
+// useful one day...
 export class Point
 {
 	constructor (x_, y_, val_) {
 		// Number of tiles down (y) or right (x) of the top-left corner
 		this._x = x_;
 		this._y = y_;
+
 		// todo: Could represent difficult terrain, elevation, tile type (square/hex)...
 		this.val = val_;
 
@@ -65,7 +111,18 @@ export class Point
 	}
 
 	distToPoint (p_)     { return Point.lp (this, p_, this.metric); }
-	distToCoord (x_, y_) { return this.distToPoint (getPoint (x_, y_)); } 
+	distToCoord (x_, y_, w_, h_)
+	{
+		const p2 = getPointFromCoord (x_, y_);
+
+		let points = new Array ();
+
+		for (let i = 0; i < w_; ++i)
+			for (let j = 0; j < h_; ++j)
+				points.push (getPointFromCoord (this.x + i, this.y + j));
+
+		return Math.min (...points.map (p1 => Point.lp (p1, p2, this.metric)));
+	} 
 	equals (p_)          { return this.x === p_.x && this.y === p_.y; }
 	isNeighbor (p_)      { return this.distToPoint (p_) === 1; }
 
@@ -149,7 +206,7 @@ export class Point
 	// target square is -45 deg (if that doesn't make sense to you, see comment below), so this function will
 	// output -pi/2.
 	// Bounded on [-pi, pi]
-	radialDistToPoint (p_, r_)
+	radialDistToPoint (p_, r_, angleType_)
 	{
 		const M_2PI  = 2 * Math.PI;
 
@@ -165,22 +222,40 @@ export class Point
 		const dy = p_.y - this.y;
 		// Bounded between [-pi, pi]
 		const angleToPoint = Math.atan2 (-dx, dy);
+
 		// Bounded between [0, 2pi] (see deg2rad)
 		const rotation = deg2rad ((r_ % 360) + 360);
 		// Bounded between [-3PI, PI]
 		const out = angleToPoint - rotation;
 		// Return an an angle between [-pi, pi]
-		return out + (out < - Math.PI ? M_2PI : 0);
+		const ret = out + (out < - Math.PI ? M_2PI : 0);
+
+		if (angleType_ === AngleTypes.DEG)
+			return rad2deg (ret);
+
+		return ret;
+	}
+
+	radialDistToToken (token_, rotation_, angleType_)
+	{
+		return this.radialDistToPoint (getPointFromToken (token_), rotation_, angleType_);
 	}
 
 	// In JS, numbers are not references, so we have to update these when they change
-	update (px_, py_)
+	update (px_, py_, width_, height_)
 	{
 		this._x = px_ / this.scale;
 		this._y = py_ / this.scale;
+
+		/*
+		const width = Math.floor (width_ / this.scale);
+		this.width = width ? width : 1;
+		const height = Math.floor (height_ / this.scale);
+		this.height = height ? height : 1;
+		*/
 	}
 
-	// Calculate the distance between Points p1 and p2 using the p-norm
+	// Calculate the distance between Points p1 and p2 using the L-norm
 	static lp (p1_, p2_, p_)
 	{
 		if (p_ === MinkowskiParameter.Chebyshev)
@@ -192,36 +267,34 @@ export class Point
 		if (p_ <= 0)
 			return undefined
 
+		console.log ("mookAI | Using L_%f-norm?!", p_);
 		// Why am I supporting this? Why are you using this? What hellish system are you implementing?
 		return Math.pow (Math.pow (Math.abs (p1_.x - p2_.x), p_) + Math.pow (Math.abs (p1_.y - p2_.y), p_), 1/p);
 	}
-	// L-infinity norm (i.e. DnD 5e's default distance metric)
+	// L_infinity-norm (i.e. DnD 5e's default distance metric)
 	static Chebyshev (p1_, p2_)
 	{
 		return Math.max (Math.abs (p1_.x - p2_.x), Math.abs (p1_.y - p2_.y))
 	};
-	// L1 norm
+	// L_1-norm
 	static Manhattan (p1_, p2_)
 	{
 		return Math.abs (p1_.x - p2_.x) + Math.abs (p1_.y - p2_.y);
 	}
-	// L2 norm
+	// L_2-norm
 	static Euclidean (p1_, p2_)
 	{
 		return Math.hypot (p1_.x - p2_.x, p1_.y - p2_.y)
 	};
 
-	// Returns a new Point located at the center of... this point. 
-	// todo: support tokens of larger sizes
-	get center () { return getPointFromCoord (this.x + 0.5, this.y + 0.5); }
 	get x () { return this._x; }
 	get y () { return this._y; }
 	// x and y offset, in pixels
 	get px () { return this.x * this.scale; }
 	get py () { return this.y * this.scale; }
-	// x and y center offset, in pixels
-	get cpx () { return (this.x + 0.5) * this.scale; }
-	get cpy () { return (this.y + 0.5) * this.scale; }
+	// Returns the offset of the point's center, in pixels
+	cpx (w_) { return (this.x + w_ / 2) * this.scale; }
+	cpy (h_) { return (this.y + h_ / 2) * this.scale; }
 
 	get scale () { return canvas.grid.size; }
 

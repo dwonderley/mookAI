@@ -1,7 +1,7 @@
 import { Behaviors, MookTypes, Target } from "./behaviors.js"
 import { ActionType, MookModel } from "./mookModel.js";
-import { Path, PathManager, isTraversable } from "./planning/pathManager.js";
-import { Point, getPoint, getPointFromToken, Neighbors, rad2deg } from "./point.js";
+import { PathManager, isTraversable } from "./planning/pathManager.js";
+import { Point, getPointFromToken, getCenterPointFromToken, Neighbors, AngleTypes } from "./planning/point.js";
 
 // Wrapper around FVTT token class
 export class Mook
@@ -35,7 +35,6 @@ export class Mook
 	async sense ()
 	{
 		this.pathManager.clear ();
-		this.pathManager.origin = this.point;
 
 		this._visibleTargets = game.combat.combatants.filter (combatant => {
 			// Even mooks won't target themselves on purpose
@@ -101,16 +100,14 @@ export class Mook
 		// Of type Target
 		const target = Behaviors.chooseTarget(this, targets);
 
-		console.log ("Target is: ");
-		console.log (target);
-
 		this.plan.push ({
 			actionType: ActionType.TARGET,
 			data: { "target": target.token, "state": true },
 		});
 
 		this.pathManager.path (target.id).within (target.range).forEach (p => {
-			if (p === this.point)
+			console.log ("(%f, %f)", p.x, p.y);
+			if (this.point.equals (p))
 				return;
 
 			this.plan.push ({
@@ -128,8 +125,6 @@ export class Mook
 			actionType: ActionType.TARGET,
 			data: { "target": target.token, "state": false },
 		});
-
-		// let distFromMaxRange = this.distToToken (target) - this.mookModel.rangedRange;
 
 		this.plan.push (this.mookModel.haltAction ());
 	}
@@ -150,6 +145,12 @@ export class Mook
 			if (this.plan.length === 0)
 			{
 				console.log ("mookAI | Planning failure: empty plan.");
+				return;
+			}
+
+			if (this.plan.reduce (a => a?.cost) > this.time)
+			{
+				console.log ("mookAI | Planning failure: too ambitious.");
 				return;
 			}
 
@@ -178,8 +179,8 @@ export class Mook
 				await this.rotate (this.degreesToTarget (action.data));
 				break;
 			case (ActionType.MOVE):
-				console.log ("Moving");
-				await this.rotate (rad2deg (this.radialDistToPoint (action.data, this.rotation)));
+				console.log ("Moving from (%f, %f) to (%f, %f)", this.point.x, this.point.y, action.data.x, action.data.y);
+				await this.rotate (this.point.radialDistToPoint (action.data, this.rotation, AngleTypes.DEG));
 				await this.move (action.data);
 				break;
 			// todo? Find a use for this
@@ -212,6 +213,8 @@ export class Mook
 
 	inCombat () { return this.token.inCombat; }
 	isPC () { return this.token.actor.isPC; }
+
+	/* Deprecated?
 	// Todo: Customize distance function selection
 	distToPoint (p_)     { return this.point.distToPoint (p_); }
 	distToCoord (x_, y_) { return this.distToPoint (getPoint (x_, y_)); }
@@ -227,6 +230,7 @@ export class Mook
 	radialDistToToken (t_) {
 		return this.radialDistToCoord (t_.x, t_.y, this.rotation);
 	}
+	*/
 
 	handleTokenUpdate (changes_)
 	{
@@ -235,12 +239,10 @@ export class Mook
 
 		const x = (changes_.x !== undefined) ? changes_.x : this.point.px;
 		const y = (changes_.y !== undefined) ? changes_.y : this.point.py;
-		this.updatePoint (x, y);
-	}
+		// const w = (changes_.w !== undefined) ? changes_.w : this.point.width;
+		// const h = (changes_.h !== undefined) ? changes_.h : this.point.height;
 
-	updatePoint (x, y)
-	{
-		this.point.update (x,y);
+		this.point.update (x, y); //, w, h);
 	}
 
 	canSee (id_)
@@ -252,7 +254,8 @@ export class Mook
 
 	async centerCamera ()
 	{
-		await canvas.animatePan ({ x: this.point.px, y: this.point.py });
+		const p = getCenterPointFromToken (this.token);
+		await canvas.animatePan ({ x: p.px, y: p.py });
 	}
 
 	// Expects degrees
@@ -261,13 +264,13 @@ export class Mook
 		console.log ("Rotating: %f", dTheta_);
 
 		await this.token.update ({ rotation: (this.rotation + dTheta_) % 360 });
-		await new Promise (resolve => setTimeout (resolve, 500));
+		await new Promise (resolve => setTimeout (resolve, 100));
 	}
 
 	get viableTargets ()
 	{
-		let meleTargets = null;
-		let rangedTargets = null;
+		let meleTargets = [];
+		let rangedTargets = [];
 
 		if (this.mookModel.hasMele)
 			meleTargets = this.visibleTargets.filter (e => {
@@ -279,31 +282,10 @@ export class Mook
 				return this.isTargetReachable (e, this.mookModel.rangedRange)
 			});
 
-		if (! meleTargets && ! rangedTargets)
+		if (meleTargets.length === 0 && rangedTargets.length === 0)
 			return null;
 
 		return { "mele": meleTargets, "ranged": rangedTargets };
-		/*
-		// Gets the nearest target
-		let maxDist = Infinity;
-		let maxRDist = Math.PI;
-		let target = null;
-
-		for (let t of this.visibleTargets)
-		{
-			const dist = this.distToToken (t);
-			const rDist = Math.abs (this.radialDistToToken (t));
-
-			if (dist > maxDist) continue;
-			if (dist === maxDist && rDist > maxRDist) continue;
-
-			target = t;
-			maxDist = dist;
-			maxRDist = rDist;
-		}
-
-		return target;
-		*/
 	}
 
 	/**
@@ -311,19 +293,31 @@ export class Mook
 	**/
 	degreesToTarget (target_)
 	{
-		const point = getPointFromToken (target_).center;
-		return rad2deg (this.point.center.radialDistToPoint (point, this.rotation));
+		const point = getCenterPointFromToken (target_);
+		return getCenterPointFromToken (this.token).radialDistToPoint (point, this.rotation, AngleTypes.DEG);
 	}
 
 	async move (point_)
 	{
-		if (! isTraversable (this.point, point_))
-			return;
+		if (! isTraversable (this.token, this.point, point_, true))
+		{
+			console.log ("mookAI | Cannot move between points (%f, %f) and (%f, %f)", this.point.x, this.point.y, point_.x, point_.y);
+			console.log (this.point);
+			console.log (point_);
+			return false;
+		}
 
-		this.point = point_;
+		let error = false;
+
 		await this.token.update ({ x: point_.px, y: point_.py }).catch (err => {
 			ui.notifications.warn (err);
+			error = true;
 		});
+
+		if (error) return false;
+
+		this.point = point_;
+
 		await this.centerCamera ();
 		await new Promise (resolve => setTimeout (resolve, 500));
 	}
@@ -336,6 +330,9 @@ export class Mook
 
 	isTargetReachable (target_, attackRange_)
 	{
+		console.log ("Checking reachability...");
+		console.log (this.pathManager.path (target_.id).terminalDistanceToDest);
+		console.log (attackRange_);
 		return this.pathManager.path (target_.id).terminalDistanceToDest <= attackRange_;
 	}
 

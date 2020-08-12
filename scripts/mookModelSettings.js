@@ -34,7 +34,7 @@ export class MookModelSettings
 		// false indicates that the mook can see everyone
 		this.useSight = true;
 		this.mookInitiative = MookInitiative.WANDER;
-		this.rotationCost = 0.5;
+		this.rotationCost = 0.2;
 
 		// todo: When I get configuration working, mooks won't attack members of the same faction (probably checking for substrings: a goblin cultist might not attack other goblins or other cultists). Right now, mooks only attack PCs.
 		// An override to the above. Some tokens, such as light sources, vehicles, etc. should not be attacked.

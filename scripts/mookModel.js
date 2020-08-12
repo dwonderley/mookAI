@@ -60,10 +60,6 @@ export class MookModel
 		this.settings = new MookModelSettings (token_);
 
 		this._token = token_;
-
-		// Override these in system extensions
-		this._hasMele = false;
-		this._hasRanged = false;
 	}
 
 	static getMookModel (token_, ...args_)
@@ -145,10 +141,10 @@ export class MookModel
 
 	// Maybe override?
 	// Can the token do something to increase its movement range? This can be called multiple times, so if you override this, track resources.
-	get canZoom () { false; }
+	get canZoom () { return false; }
 	// todo: Advanced weapon selection
-	get meleWeapon () { return this.hasMele ? this._meleWeapons[0] : null; }
-	get rangedWeapon () { return this.hasRanged ? this._rangedWeapons[0] : null; }
+	get meleWeapon () { return this.hasMele ? this.meleWeapons[0] : null; }
+	get rangedWeapon () { return this.hasRanged ? this.rangedWeapons[0] : null; }
 
 	// Extensions must override these methods
 	get meleRange () { throw "Game system not supported"; }
@@ -161,16 +157,6 @@ class MookModel5e extends MookModel
 	constructor (token_, ...args_)
 	{
 		super (token_);
-
-		this._speed = parseInt (token_.actor.data.data.attributes.speed.value, 10);
-		this._meleWeapons = token_.actor.itemTypes.weapon.filter (w => {
-			return w.hasAttack && w.data.data.actionType === "mwak";
-		});
-		this._rangedWeapons = token_.actor.itemTypes.weapon.filter (w => {
-			return w.hasAttack && w.data.data.actionType === "rwak";
-		});
-		this._hasMele = this._meleWeapons.length > 0;
-		this._hasRanged = this._rangedWeapons.length > 0;
 
 		this.hasDashAction = true;
 		this.usedDashAction = false;
@@ -210,7 +196,30 @@ class MookModel5e extends MookModel
 		return this.time;
 	}
 
-	get canZoom () { return this.hasDashAction && ! this.usedDashAction; }
+	get meleWeapons ()
+	{
+		return this.token.actor.itemTypes.weapon.filter (w => {
+			return w.hasAttack && w.data.data.actionType === "mwak";
+		});
+	}
+
+	get rangedWeapons ()
+	{
+		return this.token.actor.itemTypes.weapon.filter (w => {
+			return w.hasAttack && w.data.data.actionType === "rwak";
+		});
+	}
+
+	get _hasMele ()
+	{
+		return this.meleWeapons.length > 0;
+	}
+
+	get _hasRanged ()
+	{
+		return this.rangedWeapons.length > 0;
+	}
+
 	get meleRange ()
 	{
 		const dist = this.meleWeapon.data.data?.range?.value;
@@ -219,6 +228,7 @@ class MookModel5e extends MookModel
 
 		return Math.max (Math.floor (dist / this.gridDistance), 1);
 	}
+
 	get rangedRange ()
 	{
 		const dist = this.rangedWeapon.data.data?.range?.value;
@@ -228,7 +238,12 @@ class MookModel5e extends MookModel
 		return Math.max (Math.floor (dist / this.gridDistance), 1);
 	}
 
+	get canZoom () { return this.hasDashAction && ! this.usedDashAction; }
+
 	// A measure of the amount of time a mook has to do stuff
 	// todo: evaluate units
-	get time () { return this._speed / this.gridDistance; }
+	get time ()
+	{
+		return parseInt (this.token.actor.data.data.attributes.speed.value, 10) / this.gridDistance;
+	}
 };

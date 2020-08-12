@@ -6,7 +6,7 @@
   "version": "1.0.0",
   "minimumCoreVersion": "0.6.0",
   "compatibleCoreVersion": "0.6.5",
-  "esmodules": ["scripts/main.js", "scripts/mookAI.js", "scripts/mook.js", "scripts/point.js", "planning/pathManager.js"],
+  "esmodules": ["scripts/planning/pathManager.js", "scripts/planning/point.js", "scripts/behaviors.js", "scripts/main.js", "scripts/mook.js", "scripts/mookAI.js", "scripts/mookModel.js", "scripts/mookModelSettings.js"],
   "styles": [],
   "systems": ["dnd5e"]
 }
