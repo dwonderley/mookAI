@@ -64,14 +64,25 @@ export class MookAI
 			game.combat.nextTurn ();
 		});
 
-		document.addEventListener('keyup', evt => {
-			if (evt.key !== 'g' || mookAI.busy)
-				return;
-
-			mookAI.takeTurn ();
-		});
+		if (game.modules.get("lib-pp")?.active)
+		{
+			document.addEventListener('keyup', evt => {
+				if (evt.key !== 'g' || mookAI.busy)
+					return;
+	
+				mookAI.takeTurn ();
+			});
+		}
+		else
+		{
+			const str = "mookAI | Missing module dependency: Library - Path Planning. Please check that it is installed and enabled. mookAI cannot automate without it."
+			ui.notifications.notify (str, "error", { "permanent": true });
+			console.log (str);
+			return;
+		}
 
 		mookAI._busy = false;
+
 	}
 
 	handleSceneChange ()

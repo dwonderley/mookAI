@@ -1,5 +1,3 @@
-import { getPointFromToken, Point } from "./planning/point.js";
-
 // If you want me to remove your name from here, message me, and I'll do it :)
 export const MookTypes =
 {

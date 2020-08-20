@@ -1,7 +1,7 @@
 import { Behaviors, MookTypes, Target } from "./behaviors.js"
 import { ActionType, MookModel } from "./mookModel.js";
-import { PathManager, isTraversable } from "./planning/pathManager.js";
-import { Point, getPointFromToken, getCenterPointFromToken, Neighbors, AngleTypes } from "./planning/point.js";
+import { PathManager, isTraversable } from "/modules/lib-pp/scripts/pathManager.js";
+import { Point, getPointFromToken, getCenterPointFromToken, Neighbors, AngleTypes } from "/modules/lib-pp/scripts/point.js";
 
 // Wrapper around FVTT token class
 export class Mook
@@ -19,7 +19,7 @@ export class Mook
 		// Array of Actions
 		this._plan = new Array ();
 		// Manages the mook's attempts at path planning
-		this._pathManager = new PathManager (this._mookModel);
+		this._pathManager = new PathManager ();
 	}
 
 	startTurn ()
@@ -300,12 +300,7 @@ export class Mook
 	async move (point_)
 	{
 		if (! isTraversable (this.token, this.point, point_, true))
-		{
-			console.log ("mookAI | Cannot move between points (%f, %f) and (%f, %f)", this.point.x, this.point.y, point_.x, point_.y);
-			console.log (this.point);
-			console.log (point_);
 			return false;
-		}
 
 		let error = false;
 
