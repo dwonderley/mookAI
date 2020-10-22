@@ -1,6 +1,7 @@
+// todo: This whole thing is getting overhauled. The list below is for brainstorming. Send me any ideas/requests you have!
+
 // If you want me to remove your name from here, message me, and I'll do it :)
-export const MookTypes =
-{
+export const MookTypes = Object.freeze ({
 	// Uses mele attacks first, attacks closest
 	EAGER_BEAVER: 1,
 	// Uses ranged attacks first, attacks furthest
@@ -12,12 +13,18 @@ export const MookTypes =
 	// Attacks a random target in range
 	SHIA: 5,
 	// Attacks last token to attack mook
+	OLIVIA: 6,
 	// Attacks first token to attack mook
+	CANDICE: 7,
 	// Attacks bigest source of personal damage
 	// Attacks bigest source of total damage
-	// Attacks token that last killed an ally
-	// Attacks token that has killed the most allies
+	// Attacks token that last defeated an ally
+	// Attacks token that has defeated the most allies
+	MICHAEL: 12,
 	// Pack tactics
+	A_REALLY_GOOD_DOG: 13,
+	// Attacks next in turn order
+	ALLISON: 14,
 	
 	// Secret GM tech (don't use too many of these, or they'll catch on):
 	// Attacks healthiest
@@ -25,8 +32,7 @@ export const MookTypes =
 	// Runs to get help (or not)
 	SIR_ROBBIN: 9002,
 	// Attacks highest "armor"
-	// Attacks next in turn order
-}
+});
 
 export class Target
 {
@@ -56,26 +62,57 @@ export class Behaviors
 		switch (mook_.mookModel.settings.mookType)
 		{
 		case (MookTypes.EAGER_BEAVER):
-			return Behaviors.attackClosest (mook_, targets_);
+			return Behaviors.attackByDistance (mook_, targets_, false);
+		case (MookTypes.NELSON):
+			return Behaviors.attackByHealth (mook_, targets_, false);
+		case (MookTypes.SHIA):
+			return Behaviors.surprise (mook_, targets_);
+		case (MookTypes.VEGETA):
+			return Behaviors.attackByHealth (mook_, targets_, true);
 		}
 
 		throw "Failed to select a target";
 	}
-	static attackClosest (mook_, targets_)
+
+	static attackByValue (mm_, targets_, evaluator_, min_)
 	{
+		const comparator = min ? Behaviors.getLargest : Behaviors.getSmallest;
+
+		const meleToken = comparator (targets_.mele?.map (t => t.token), evaluator_);
+		const rangedToken = comparator (targets_.ranged?.map (t => t.token), evaluator_);
+
+		if (! meleToken && ! rangedToken)
+			return null;
+
+		if (! meleToken)
+			return new Target (rangedToken, mm_.rangedRange, mm_.rangedAttackAction ());
+
+		if (! rangedToken)
+			return new Target (meleToken, mm_.meleRange, mm_.meleAttackAction ());
+
+		// We want either the smallest or largest value depending on min_. We can find that with an xor.
+		if ((evaluator_ (meleToken) <= evaluator_ (rangedToken)) ^ min_)
+			return new Target (meleToken, mm_.meleRange, mm_.meleAttackAction ());
+
+		return new Target (rangedToken, mm_.rangedRange, mm_.rangedAttackAction ());
+	}
+
+	static attackByDistance (mook_, targets_, gmTech_)
+	{
+		const func = gmTech_ ? Behaviors.getLargest : Behaviors.getSmallest;
 		const mm = mook_.mookModel;
 
 		if (mm.hasMele && targets_.mele.length > 0)
 		{
-			const token = Behaviors.getSmallest (targets_.mele, t => {
-				return mook_.pathManager.path (t.id)?.cost;
+			const token = func (targets_.mele, t => {
+				return mook_.pathManager.path (mook_.token.id, t.id).cost;
 			});
 			return new Target (token, mm.meleRange, mm.meleAttackAction ());
 		}
 		else if (mm.hasRanged && targets_.ranged.length > 0)
 		{
-			const token = Behaviors.getSmallest (targets_.ranged, t => {
-				return mook_.pathManager.path (t.id)?.cost;
+			const token = func (targets_.ranged, t => {
+				return mook_.pathManager.path (mook_.token.id, t.id).cost;
 			});
 			return new Target (token, mm.rangedRange, mm.rangedAttackAction ());
 		}
@@ -83,6 +120,61 @@ export class Behaviors
 		return null;
 	}
 
+	static attackByCurrentHealth (mook_, targets_, gmTech_)
+	{
+		const getHealth = mook_.mookModel.getCurrentHealth;
+		return attackByValue (mook_.mookModel, targets_, getHealth, gmTech_);
+	}
+
+	static surprise (mook_, targets_)
+	{
+		const mm = mook_.mookModel;
+		const numTargets = (mm.hasMele ? targets_.mele.length : 0)
+				 + (mm.hasRanged ? targets_.ranged.length : 0);
+		
+		if (! numTargets) return null;
+
+		let targetNum = Math.floor (Math.random () * numTargets);
+
+		if (targetNum < 2)
+			console.log (targetNum);
+
+		if (mm.hasMele)
+		{
+			if (targets_.mele.length > targetNum)
+				return new Target (targets_.mele[targetNum],
+						   mm.meleRange,
+						   mm.meleAttackAction ());
+			
+			targetNum -= targets_.mele.length;
+		}
+
+		return new Target (targets_.ranged[targetNum],
+				   mm.rangedRange,
+				   mm.rangedAttackAction ());
+	}
+
+	static getLargest (array_, func_)
+	{
+		if (! array_ || ! func_)
+			return null;
+
+		let val = -Infinity;
+		let out = null;
+
+		for (let i = 0; i < array_.length; ++i)
+		{
+			const v = func_ (array_[i]);
+
+			if (v > val)
+			{
+				out = array_[i];
+				val = v;
+			}
+		}
+
+		return out;
+	}
 	static getSmallest (array_, func_)
 	{
 		let val = Infinity;

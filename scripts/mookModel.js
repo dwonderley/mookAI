@@ -20,15 +20,15 @@ The goal for this class is to implement different subclasses for systems other t
 If this is done, the module should be able to support those systems without additional changes since everything "above" it has been designed to be system-agnostic. The two exceptions are that the system name must be added to the getMookModel static function below and the distance metric type must be added to the Point class' constructor.
 At the moment, I am prioritizing functionality and bug fixes and have no plans to support other systems. However, if you want to implement a MookModel for the system you play, I will be happy to work with you and to review and merge in your code
 */
-import { MookModelSettings, MookInitiative  } from "./mookModelSettings.js"
+import { MookModelSettings, MookModelSettings5e, MookInitiative  } from "./mookModelSettings.js"
 
 /*
 Actions are objects that contain:
 1) ActionType
 2) Cost (in units of "time")
 3) Data
-Actions of ActionType 0-7 are provided by the base MookModel, and these functions should not be overloaded
-Actions of ActionType 8+ are attacks and are handled by system-specific MookModels. There should be a method to create an Action of the above form and an attack () method to handle those actions. See MookModel5e for an example.
+Actions of ActionType 0-9 are provided by the base MookModel, and these functions should not be overloaded
+Actions of ActionType 10+ are handled by system-specific MookModels. There should be a method to create and use Actions of those types. See MookModel5e for an example.
 */
 export const ActionType =
 {
@@ -44,22 +44,76 @@ export const ActionType =
 	// Move forward one tile
 	// todo: Move to an *adjacent* tile?
 	STEP: 6,
-	EXPLORE: 7,
-	TARGET: 8,
-	// Subsystems should provide methods for these
-	MELE_ATTACK: 9,
-	RANGED_ATTACK: 10,
-	// todo: Spell attack? Not very mook-like, but perhaps useful to someone
+	// Move along entire path
+	TRAVERSE: 7,
+	EXPLORE: 8,
+	TARGET: 9,
+	// Subsystems must provide a method to handle this
+	ATTACK: 11,
+	// todo
+	ZOOM: 10,
+	CAST: 12,
 }
+
+class Ability
+{
+	constructor (type_, data_)
+	{
+		this.type = type_;
+		this.data = data_;
+		this.used = false;
+
+		if (this.data.recharge === undefined)
+			this.data.recharge = obj_ => { obj_.used = false };
+	}
+
+	act (data_)
+	{
+		if (! this.can ())
+			return null;
+
+		this.used = true;
+
+		if (this.data.act === undefined)
+			return null;
+
+		return this.data.act (data_);
+	}
+	can () { return ! this.used; }
+	recharge () { this.data.recharge (this); }
+};
+/*
+		if (this.data.can === undefined)
+			this.data.can = obj_ => { return ! obj_.used; };
+		if (this.data.recharge === undefined)
+			this.data.recharge = obj_ => { obj_.used = false };
+	}
+
+	async act (data_)
+	{
+		if (! this.can ())
+			return null;
+
+		this.used = true;
+		return await this.data?.act (data_);
+	}
+	async can () { return await this.data.can (this); }
+	async recharge () { return await this.data.recharge (this); }
+*/
 
 // Abstract class. Use the static getMookModel method until I figure out the "correct" way to do it in JS
 export class MookModel
 {
-	constructor (token_)
+	constructor (token_, settings_)
 	{
-		this.settings = new MookModelSettings (token_);
-
+		this.settings = settings_;
 		this._token = token_;
+
+		this._actions = new Array ();
+		this._targetHistory = new Array ();
+
+		this.attacksRemaining = 0;
+		this.zoomsRemaining = 0;
 	}
 
 	static getMookModel (token_, ...args_)
@@ -67,15 +121,15 @@ export class MookModel
 		switch (game.system.id)
 		{
 		case ("dnd5e"):
-			return new MookModel5e (token_, ...args_);
+			return new MookModel5e (token_, new MookModelSettings5e (token_), ...args_);
 		}
 
 		return null;
 	}
 
 	// Do not override these
+	async attack (action_) { _attack (action_); }
 	haltAction () { return { actionType: ActionType.HALT, cost: 0 }; }
-	stepAction () { return { actionType: ActionType.STEP, cost: 1 }; }
 	planAction () { return { actionType: ActionType.PLAN, cost: 0 }; }
 	rotateAction (deg_)
 	{
@@ -85,11 +139,13 @@ export class MookModel
 			data: deg_
 		}
 	}
-	faceAction (token_) { return { actionType: ActionType.FACE, data: token_ } }
-	randomRotateAction () { return this.rotateAction (45 * (Math.random () > 0.5 ? 1 : -1)); }
 	senseAction () { return { actionType: ActionType.SENSE, cost: 0 }; }
+	// Reset the mook model's resources for use
+	startTurn () { this.resetResources (); this._startTurn (); }
+	stepAction () { return { actionType: ActionType.STEP, cost: 1 }; }
+	resetResources () { this._resetResources (); }
 
-	// Maybe override?
+	// Override as needed
 	exploreActions ()
 	{
 		let ret = new Array ();
@@ -113,23 +169,18 @@ export class MookModel
 
 		return ret;
 	}
-
-	// Override as needed
-	meleAttackAction ()
-	{
-		return { actionType: ActionType.MELE_ATTACK, data: this.meleWeapon };
-	}
-	rangedAttackAction ()
-	{
-		return { actionType: ActionType.RANGED_ATTACK, data: this.rangedWeapon };
-	}
+	// Override this and exploreActions if you want your mooks to do something instead of wander around
+	explore (data_) { return; }
+	faceAction (token_) { return { actionType: ActionType.FACE, data: token_ }; }
+	meleAttackAction () { return { actionType: ActionType.ATTACK, data: { weapon: this.meleWeapon }}; }
+	rangedAttackAction () { return { actionType: ActionType.ATTACK, data: { weapon: this.rangedWeapon }}; }
+	randomRotateAction () { return this.rotateAction (45 * (Math.random () > 0.5 ? 1 : -1)); }
+	_resetResources () { }
+	_startTurn () { }
 	zoom () { return this.time; }
 
 	// Subclasses MUST override
-	// action_ is either a MELE_ATTACK or a RANGED_ATTACK
-	async attack (action_) { throw "Game system not supported" };
-	// Reset the mook model's resources for use
-	startTurn () {};
+	_attack (action_) { throw "Game system not supported"; }
 
 	// Do not override
 	get gridDistance () { return game.scenes.active.data.gridDistance; }
@@ -139,61 +190,181 @@ export class MookModel
 	get hasVision () { return this.settings.useSight && this.hasSight; }
 	get token () { return this._token; }
 
-	// Maybe override?
-	// Can the token do something to increase its movement range? This can be called multiple times, so if you override this, track resources.
-	get canZoom () { return false; }
+	addTarget (target_) { this._targetHistory.push (target_); }
+	get firstTarget () { return this._targetHistory.length === 0 ? null : this._targetHistory[0]; }
+	get lastTarget () { return this._targetHistory.length === 0 ? null : this._targetHistory[this._targetHistory.length - 1]; }
+	get targetHistory () { return this._targetHistory; }
+
+	// Override as needed
+	get attacksPerTurn () { return 1; }
+	get canAttack () { return this.attacksRemaining > 0; }
+	// Can the token do something to increase its movement range?
+	get canZoom () { return this.zoomsRemaining > 0; }
+	getHealthPercent (token_) { return this.getCurrentHealth (token_) / this.getMaxHealth (token_); }
 	// todo: Advanced weapon selection
 	get meleWeapon () { return this.hasMele ? this.meleWeapons[0] : null; }
 	get rangedWeapon () { return this.hasRanged ? this.rangedWeapons[0] : null; }
+	get zoomsPerTurn () { return 1; }
 
 	// Extensions must override these methods
 	get meleRange () { throw "Game system not supported"; }
 	get rangedRange () { throw "Game system not supported"; }
+	getCurrentHealth (token_) { throw "Game system not supported"; }
+	getMaxHealth (token_) { throw "Game system not supported"; }
+	// Resource measuring how much a token can do on their turn. It takes one time unit for a token to move one tile
 	get time () { throw "Game system not supported"; }
 };
 
 class MookModel5e extends MookModel
 {
-	constructor (token_, ...args_)
+	constructor (token_, settings_, ...args_)
 	{
-		super (token_);
+		super (token_, settings_);
 
-		this.hasDashAction = true;
-		this.usedDashAction = false;
+		this.actionsUsed = 0;
+		// Creatures in 5e may only use one bonus action
+		this.bonusActionUsed = false;
 	}
 
-	// action_ is either a MELE_ATTACK or a RANGED_ATTACK
-	async attack (action_)
+	async doAttack (name_)
 	{
-		// As implemented, DnD5e doesn't care what type of attack it is, but it must still be an attack
-		if (action_.actionType !== ActionType.RANGED_ATTACK && action_.actionType !== ActionType.MELE_ATTACK)
-			return;
-
-		if (game.modules.get("minor-qol")?.active)
+		if (game.modules.get("midi-qol")?.active)
 		{
-			await MinorQOL.doMacroRoll (event, action_.data.data.name).catch (err => {
+			await MidiQOL.doMacroRoll (event, name_).catch (err => {
+				ui.notifications.warn ("mookAI | Problem encountered: " + err);
+			});
+		}
+		else if (game.modules.get("minor-qol")?.active)
+		{
+			await MinorQOL.doMacroRoll (event, name_).catch (err => {
 				ui.notifications.warn ("mookAI | Problem encountered: " + err);
 			});
 		}
 		else if (game.modules.get("betterrolls5e")?.active)
 		{
-			BetterRolls.quickRoll (action_.data.data.name);
+			BetterRolls.quickRoll (name_);
 		}
 		else
 		{
-			game.dnd5e.rollItemMacro(action_.data.data.name);
+			game.dnd5e.rollItemMacro(name_);
 		}
 	}
 
-	startTurn ()
+	async attack (action_)
 	{
-		this.usedDashAction = false;
+		// As implemented, DnD5e doesn't care what type of attack it is, but it must still be an attack
+		if (action_.actionType !== ActionType.ATTACK)
+			return;
+
+		if (! this.canAttack)
+			return;
+
+		const name = action_.data.weapon.data.name;
+
+		this._actions.filter (a => a.type === "attack" && a.can ()).forEach (a => {
+			if (a.data.duration === "full")
+			{
+				if (this.actionsUsed >= this.settings.actionsPerTurn) return;
+
+				for (let i = 0; i < this.settings.attacksPerAction; ++i)
+					this.doAttack (name);
+
+				++this.actionsUsed;
+				// todo: a.act is doAttack
+				a.act ();
+			}
+			else if (a.data.duration === "bonus")
+			{
+				if (this.bonusActionUsed) return;
+
+				for (let i = 0; i < this.settings.attacksPerBonusAction; ++i)
+					this.doAttack (name);
+
+				this.bonusActionUsed = true;
+				a.act ();
+				return;
+			}
+			else
+			{
+				for (let i = 0; i < this.settings.attacksPerFreeAction; ++i)
+					this.doAttack (name);
+
+				a.act ();
+				return;
+			}
+		});
+	}
+
+	_resetResources ()
+	{
+		this._actions = new Array ();
+		this.actionsUsed = 0;
+		this.bonusActionUsed = 0;
+	}
+
+	_startTurn ()
+	{
+		if (this.useDashAction)
+		{
+			const dashAct = () => { return this.time; };
+
+			for (let i = 0; i < this.settings.dashActionsPerTurn; ++i)
+				this._actions.push (new Ability ("dash", { "duration": "full", "act": dashAct }));
+			if (this.hasDashBonusAction)
+				this._actions.push (new Ability ("dash", { "duration": "bonus", "act": dashAct }));
+			if (this.hasDashFreeAction)
+				this._actions.push (new Ability ("dash", { "duration": "free", "act": dashAct }));
+		}
+
+		for (let i = 0; i < this.settings.actionsPerTurn; ++i)
+			this._actions.push (new Ability ("attack", { "duration": "full" }));
+		if (this.settings.hasBonusAttack)
+			this._actions.push (new Ability ("attack", { "duration": "bonus" }));
+		if (this.settings.hasFreeAttack)
+			this._actions.push (new Ability ("attack", { "duration": "free" }));
 	}
 
 	zoom ()
 	{
-		this.usedDashAction = true;
-		return this.time;
+		if (! this.canZoom)
+			return 0;
+
+		const dashActions = this._actions.filter (a => {
+			return a.type === "dash" && a.can ();
+		});
+
+		if (dashActions.length === 0)
+			return 0;
+
+		const takeAction = (arr, str) =>
+		{
+			const actions = arr.filter (a => a.data.duration === str);
+
+			if (actions.length !== 0)
+				return actions[0].act ();
+
+			return 0;
+		};
+
+		const freeZoom = takeAction (dashActions, "free");
+		if (freeZoom > 0) return freeZoom;
+
+		const bonusZoom = takeAction (dashActions, "bonus");
+		if (bonusZoom > 0)
+		{
+			this.bonusActionUsed = true;
+			return bonusZoom;
+		}
+
+		const fullZoom = takeAction (dashActions, "full");
+		if (fullZoom > 0)
+		{
+			++this.actionsUsed;
+			return fullZoom;
+		}
+
+		console.log ("mookAI | Hit unreachable state: MookModel5e::zoom ()");
+		return 0;
 	}
 
 	get meleWeapons ()
@@ -238,12 +409,64 @@ class MookModel5e extends MookModel
 		return Math.max (Math.floor (dist / this.gridDistance), 1);
 	}
 
-	get canZoom () { return this.hasDashAction && ! this.usedDashAction; }
+	get canAttack ()
+	{
+		const attacks = this._actions.filter (a => a.type === "attack");
+		
+		if (this.actionsUsed < this.settings.actionsPerTurn
+		    && attacks.some (a => a.data.duration === "full" && a.can ()))
+			return true;
+
+		if (! this.bonusActionUsed && attacks.some (a => a.data.duration === "bonus" && a.can ()))
+			return true;
+
+		return attacks.some (a => a.data.duration === "free" && a.can ());
+	}
+	get canZoom ()
+	{ 
+		const dashes = this._actions.filter (a => a.type === "dash");
+
+		if (this.actionsUsed < this.settings.actionsPerTurn
+		    && dashes.some (a => a.data.duration === "full" && a.can ()))
+			return true;
+
+		if (! this.bonusActionUsed && dashes.some (a => a.data.duration === "bonus" && a.can ()))
+			return true;
+
+		return dashes.some (a => a.data.duration === "free" && a.can ());
+	}
+
+
+	// Get various token data
+	getCurrentHealth (token_ = this.token)
+	{
+		return token_.actor.data.data.attributes.hp.value;
+	}
+	getMaxHealth (token_ = this.token)
+	{
+		return token_.actor.data.data.attributes.hp.max;
+	}
+
+	get hasDashAction () { return this.settings.dashActionsPerTurn > 0; }
+	get hasDashBonusAction () { return this.settings.hasDashBonusAction; }
+	get hasDashFreeAction () { return this.settings.hasDashFreeAction; }
+	get useDashAction ()
+	{
+		return this.settings.useDashAction
+		       && (this.hasDashAction || this.hasDashBonusAction || this.hasDashFreeAction);
+	}
 
 	// A measure of the amount of time a mook has to do stuff
 	// todo: evaluate units
 	get time ()
 	{
 		return parseInt (this.token.actor.data.data.attributes.speed.value, 10) / this.gridDistance;
+	}
+	get zoomsPerTurn ()
+	{
+		if (! this.useDashAction)
+			return 0;
+
+		return this.settings.dashActionsPerTurn + this.hasDashBonusAction + this.hasDashFreeAction;
 	}
 };
