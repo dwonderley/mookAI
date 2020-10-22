@@ -2,6 +2,7 @@
 The MookModel is an abstraction of system- and user-specific information:
 its intended purpose is to hold all the messy bits so that the code above it
 doesn't have to handle a bunch of edge cases.
+
 When this work is complete (or as complete as any coding project can be...),
 there will be various configuration settings that change how mooks behave.
 For example, there might be a CowardlyMook who avoids mele combat, a
@@ -17,7 +18,9 @@ This module does not free the GM of responsibility of combat outcomes. Like any
 tool, its usage is at the discretion of the practitioner.
 
 The goal for this class is to implement different subclasses for systems other than DnD5e. This process is relatively simple, as only few methods need to be overridden, as demonstrated by MookModel5e below.
-If this is done, the module should be able to support those systems without additional changes since everything "above" it has been designed to be system-agnostic. The two exceptions are that the system name must be added to the getMookModel static function below and the distance metric type must be added to the Point class' constructor.
+
+If this is done, the module should be able to support those systems without additional changes since everything "above" it has been designed to be system-agnostic. The two exceptions are that the system name must be added to the getMookModel static function below.
+
 At the moment, I am prioritizing functionality and bug fixes and have no plans to support other systems. However, if you want to implement a MookModel for the system you play, I will be happy to work with you and to review and merge in your code
 */
 import { MookModelSettings, MookModelSettings5e, MookInitiative  } from "./mookModelSettings.js"
@@ -101,7 +104,7 @@ class Ability
 	async recharge () { return await this.data.recharge (this); }
 */
 
-// Abstract class. Use the static getMookModel method until I figure out the "correct" way to do it in JS
+// Abstract class
 export class MookModel
 {
 	constructor (token_, settings_)
@@ -228,6 +231,7 @@ class MookModel5e extends MookModel
 
 	async doAttack (name_)
 	{
+		// todo: setting
 		if (game.modules.get("midi-qol")?.active)
 		{
 			await MidiQOL.doMacroRoll (event, name_).catch (err => {

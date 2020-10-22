@@ -272,10 +272,14 @@ export class Mook
 			this.time -= action.cost ? action.cost : 0;
 		}
 
+		let str = "Unknown failure";
+
 		if (tries <= 0)
-			console.log ("mookAI | Planning failure: forced exit after too many loops.");
+			str = "mookAI | Planning failure: forced exit after too many loops.";
 		if (this.time <= -1)
-			console.log ("mookAI | Planning failure: mook took too many actions.");
+			str = "mookAI | Planning failure: mook took too many actions.";
+
+		this.handleFailure (str);
 	}
 
 	planApproved ()

@@ -32,7 +32,7 @@ export class MookModelSettings
 		this.mookType = MookTypes[settingIndexToString ("mookAI.MookType", "MookType")];
 
 		// false indicates "do not automate this token"
-		// todo: default false when actor-level configuration works
+		// todo: default false when actor-level configuration is available
 		this.useAI = "true";
 
 		this.useMele = game.settings.get ("mookAI", "UseMele");
@@ -75,17 +75,17 @@ export class MookModelSettings5e extends MookModelSettings
 	{
 		super (token_);
 
-		this.actionsPerTurn = 2;
+		this.actionsPerTurn = 1;
 		this.attacksPerAction = 1;
 
-		this.hasBonusAttack = true;
-		this.attacksPerBonusAction = 0;
-		this.hasFreeAttack = true;
+		this.hasBonusAttack = false;
+		this.attacksPerBonusAction = 1;
+		this.hasFreeAttack = false;
 		this.attacksPerFreeAction = 1;
 
 		this.useDashAction = true;
 
-		this.dashActionsPerTurn = 2;
+		this.dashActionsPerTurn = 1;
 		this.hasDashBonusAction = false;
 		this.hasDashFreeAction = false;
 	}

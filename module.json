@@ -4,8 +4,8 @@
   "description": "<p>The mook is characterizied by a lack of ambition: they must be told where to go, what to do, and when to do it. This module automates those decisions on their behalf, freeing you of managing their doomed efforts.</p><p>The scope of this module does not include full automation. It is merely a tool to handle the movement and choices of low-intelligence, low-utility, high-quantity enemies (e.g. goblins, wild animals, barbarians) so that the game master may focus on the Heroes and their true adversaries.</p><p>This module adds a hotkey ('g') that, when pressed, triggers this automation. The module finds the token with the current initiative, checks its vision for possible targets, chooses one to attack (or explores if there are none), plans a collission-free path, moves the token into range, attacks, and ends the turn. Mooks will repeat these steps to account for changes in vision and will run until they attack or run out of resources.</p><p>In a future release, rules for taking a turn will be customized from a token's actor's character sheet, but for now, settings apply to all tokens.</p><p>Please read the documentation.</p>",
   "author": "Dave Of Wonders",
   "version": "1.0.0",
-  "minimumCoreVersion": "0.6.6",
-  "compatibleCoreVersion": "0.6.6",
+  "minimumCoreVersion": "0.0.1",
+  "compatibleCoreVersion": "0.7.5",
   "dependencies": [
     {
       "name": "lib-find-the-path"

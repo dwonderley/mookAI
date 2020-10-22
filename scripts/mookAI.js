@@ -171,6 +171,7 @@ export class MookAI
 			game.combat.previousTurn ();
 		});
 
+		/*
 		document.addEventListener('keyup', evt => {
 			if (evt.key !== 't')
 				return;
@@ -193,6 +194,7 @@ export class MookAI
 			}) ();
 			console.timeEnd ("myTimer");
 		});
+		*/
 
 		document.addEventListener('keyup', evt => {
 			if (evt.key !== 'n' || ! evt.target.classList.contains ("game") || this.busy)
