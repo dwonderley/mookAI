@@ -231,20 +231,7 @@ class MookModel5e extends MookModel
 
 	async doAttack (name_)
 	{
-		// todo: setting
-		if (game.modules.get("midi-qol")?.active)
-		{
-			await MidiQOL.doMacroRoll (event, name_).catch (err => {
-				ui.notifications.warn ("mookAI | Problem encountered: " + err);
-			});
-		}
-		else if (game.modules.get("minor-qol")?.active)
-		{
-			await MinorQOL.doMacroRoll (event, name_).catch (err => {
-				ui.notifications.warn ("mookAI | Problem encountered: " + err);
-			});
-		}
-		else if (game.modules.get("betterrolls5e")?.active)
+		if (game.modules.get("betterrolls5e")?.active)
 		{
 			BetterRolls.quickRoll (name_);
 		}
