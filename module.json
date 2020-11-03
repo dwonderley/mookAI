@@ -12,5 +12,8 @@
     }],
   "esmodules": ["scripts/behaviors.js", "scripts/main.js", "scripts/mook.js", "scripts/mookAI.js", "scripts/mookModel.js", "scripts/mookModelSettings.js"],
   "styles": [],
-  "systems": ["dnd5e"]
+  "systems": ["dnd5e"],
+  "url": "https://github.com/dwonderley/mookAI",
+  "manifest": "https://raw.githubusercontent.com/dwonderley/mookAI/master/module.json",
+  "download": "https://github.com/dwonderley/mookAI/releases/latest/download/mookAI-master.zip"
 }
