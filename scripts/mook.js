@@ -42,7 +42,7 @@ export class Mook
 			collisionConfig: { checkCollision: true, token: token_ }
 		});
 
-		this.debug = false;
+		this.debug = true;
 	}
 
 	startTurn ()
@@ -51,7 +51,9 @@ export class Mook
 		this.takeControl ();
 		this.mookModel.startTurn ();
 
-		this._start = this._segment;
+		this._start = this._pointFactory.segmentFromToken (this.token);
+		this._segment = this._start;
+
 		this.time = this.mookModel.time;
 		this._visibleTargets.splice (0);
 	}
@@ -67,9 +69,11 @@ export class Mook
 			const token = canvas.tokens.get (combatant.tokenId);
 
 			// todo: add "factions" to allow targeting of npcs
-			if (! token.actor.isPC) return false;
+			if (! this.isPC (token)) return false;
 			// This shouldn't be possible
 			if (! token.inCombat) return false;
+			// Don't attack downed PCs
+			if (this.mookModel.getCurrentHealth (token) <= 0) return false;
 			// If the mook doesn't have vision, then it can see everyone. This choice avoids many problems.
 			if (this.mookModel.hasVision && ! this.canSee (token.id)) return false;
 
@@ -88,6 +92,12 @@ export class Mook
 
 		if (this.visibleTargets.length === 0)
 		{
+			if (this.time < 1)
+			{
+				this.plan.push (this.mookModel.haltAction ());
+				return;
+			}
+
 			this.mookModel.exploreActions ().forEach (a => {
 				this.plan.push (a);
 			});
@@ -134,11 +144,18 @@ export class Mook
 
 		const path = this.pathManager.path (this.token.id, target.id);
 
-		this.plan.push ({
-			actionType: ActionType.TRAVERSE,
-			cost: path.within (target.range).length - 1,
-			data: { "path": path, "dist": target.range }
-		});
+		if (path.valid)
+			this.plan.push ({
+				actionType: ActionType.TRAVERSE,
+				cost: path.within (target.range).length - 1,
+				data: { "path": path, "dist": target.range }
+			});
+		else
+			this.plan.push ({
+				actionType: ActionType.TRAVERSE,
+				cost: 0,
+				data: { "path": null, "dist": target.range }
+			});
 
 		this.plan.push (this.mookModel.faceAction (target.token));
 
@@ -232,8 +249,12 @@ export class Mook
 				break;
 			case (ActionType.TRAVERSE):
 				if (this.debug) console.log ("Traversing");
-				this.utility.path = action.data.path;
-				this.utility.highlightPoints (action.data.path.path.map (s => s.origin));
+
+				if (action.cost > 0)
+				{
+					this.utility.path = action.data.path;
+					this.utility.highlightPoints (action.data.path.path.map (s => s.origin));
+				}
 
 				let dialogPromise = new Promise ((resolve, reject) => {
 					const dialog = new Dialog ({
@@ -264,9 +285,12 @@ export class Mook
 					this.handleFailure (new Abort ("User aborted plan"));
 				}
 
-				this.utility.clearHighlights ();
-				if (! await this.utility.traverse (action.data.dist, this.rotationDelay, this.moveDelay))
-					this.handleFailure (new Error ("Failed to traverse path"));
+				if (action.cost > 0)
+				{
+					this.utility.clearHighlights ();
+					if (! await this.utility.traverse (action.data.dist, this.rotationDelay, this.moveDelay))
+						this.handleFailure (new Error ("Failed to traverse path"));
+				}
 			}
 
 			this.time -= action.cost ? action.cost : 0;
@@ -293,7 +317,7 @@ export class Mook
 	}
 
 	inCombat () { return this.token.inCombat; }
-	isPC () { return this.token.actor.isPC; }
+	isPC (token_ = this.token) { return token_.actor.hasPlayerOwner; }
 
 	handleTokenUpdate (changes_)
 	{

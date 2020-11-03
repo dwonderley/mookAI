@@ -64,11 +64,11 @@ export class Behaviors
 		case (MookTypes.EAGER_BEAVER):
 			return Behaviors.attackByDistance (mook_, targets_, false);
 		case (MookTypes.NELSON):
-			return Behaviors.attackByHealth (mook_, targets_, false);
+			return Behaviors.attackByCurrentHealth (mook_, targets_, false);
 		case (MookTypes.SHIA):
 			return Behaviors.surprise (mook_, targets_);
 		case (MookTypes.VEGETA):
-			return Behaviors.attackByHealth (mook_, targets_, true);
+			return Behaviors.attackByCurrentHealth (mook_, targets_, true);
 		}
 
 		throw "Failed to select a target";

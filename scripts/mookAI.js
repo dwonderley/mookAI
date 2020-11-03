@@ -252,9 +252,7 @@ export class MookAI
 			throw "No combats in active scene";
 		}
 
-		// Work around for FVTT bug. game.combat.current is null when a scene is loaded
-		await game.combat.previousTurn ();
-		await game.combat.nextTurn ();
+		await game.combat.activate ();
 	}
 
 	combatStart (combat_)
@@ -328,7 +326,7 @@ export class MookAI
 				throw "Failed to find mook " + game.combat.current.tokenId + " in scene " + game.scenes.active.id;
 			}
 	
-			if (mook.isPC ())
+			if (mook.token.actor.hasPlayerOwner)
 			{
 				console.log ("mookAI | Not taking turn for player character");
 				return;
