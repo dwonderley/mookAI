@@ -5,6 +5,8 @@ The mook is a creature characterizied by their lack of ambition: they must be to
 
 ![Move mooks quickly](https://media2.giphy.com/media/XC6wbezvTHa264E03K/giphy.gif)
 
+I apologize for the gif quality. I'll find a better solution before the next update, but I don't think it's something to delay the release over.
+
 ## How does it work?
 When a hotkey is pressed ('g', for [g]o), mookAI takes the turn for the active token in the turn order*. This process consists of the following steps:
 * The mook** will look around for PCs
