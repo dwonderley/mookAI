@@ -3,7 +3,7 @@ mookAI provides combat automation for low-utility NPCs.
 
 The mook is a creature characterizied by their lack of ambition: they must be told where to go, what to do, and when to do it. This module automates those decisions, freeing you of managing their doomed efforts. In effect, this tool is primarily a time-saving device: it shifts the burden of attention, freeing the GM to spend more time playing the villian(s) without dominating combat activity. For example, the GM could use mookAI to take several NPC turns in just a few seconds while describing all of the mooks' actions as though they had happend simultaneously, as below.
 
-
+![Move mooks quickly](https://media2.giphy.com/media/XC6wbezvTHa264E03K/giphy.gif)
 
 ## How does it work?
 When a hotkey is pressed ('g', for [g]o), mookAI takes the turn for the active token in the turn order*. This process consists of the following steps:
@@ -29,6 +29,8 @@ When a hotkey is pressed ('g', for [g]o), mookAI takes the turn for the active t
 * If accepted, the mook will automatically move along the projected path, attack, and end their turn
   * mookAI will automatically use one of midi-qol, minor-qol, BetterRolls5e, or the default roller, in that order
 
+![Move respect vision](https://media2.giphy.com/media/ZhIknG0j4RlOa30Qsi/giphy.gif)
+
 ## Notes and future plans
 Currently, only 5e is supported, but the core of mookAI is system-agnostic. Other systems can be implemented in a few hours by overriding the indicated methods in the MookModel class. MookModel5e demonstrates how this is done. Mainly, mookAI needs to be told where to find certain data (movement speed, attack range, actions per turn) and how to interpret it. I can't implement these models for every system, but I am more than happy to assist anyone who wants to adapt mookAI for the system they use.
 
@@ -41,6 +43,8 @@ mookAI has a single dependency, <a href="https://github.com/dwonderley/lib-find-
 There is a known bug where sometimes the ids of combatants in the combat tracker do not match the token ids. I haven't been able to replicate this problem with consistency. The only way I've found to fix it is to delete the token and re-add it to the combat tracker. Failing that, moving to a different combat will solve the problem. This has only happened a couple of times in months of testing.
 
 I recommend using the "creep" option for mook exploration. I may make the "wander" option more intelligent (i.e. use the path planner) eventually, but at the moment, I feel like it is too random.
+
+![Mooks respect boundaries](https://media.giphy.com/media/we5L3Yc5gudU80un7q/giphy.gif)
 
 *mookAI will not take the turn of PCs
 
