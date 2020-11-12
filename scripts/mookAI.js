@@ -2,11 +2,6 @@ import { Abort, Mook } from "./mook.js"
 import { MinkowskiParameter } from "/modules/lib-find-the-path/scripts/point.js";
 import { FTPUtility } from "/modules/lib-find-the-path/scripts/utility.js";
 
-// Check if combat is active on startup
-// When combat updates, add a mook for each npc in combat
-// createCombat
-// createCombatant
-
 let mookAI;
 
 function getDistanceMetric ()
