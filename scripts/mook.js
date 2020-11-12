@@ -225,7 +225,6 @@ export class Mook
 				if (this.debug)
 					console.log ("Moving from (%f, %f) to (%f, %f)",
 						     this.point.x, this.point.y, action.data.x, action.data.y);
-				await this.rotate (this.point.radialDistToPoint (action.data, this.rotation, AngleTypes.DEG));
 				await this.move (action.data);
 				break;
 			// todo? Find a use for this
@@ -275,6 +274,8 @@ export class Mook
 					});
 
 					dialog.render (true);
+					dialog.position.top = 120;
+					dialog.position.left = 120;
 				});
 
 				try {
@@ -304,16 +305,6 @@ export class Mook
 			str = "mookAI | Planning failure: mook took too many actions.";
 
 		this.handleFailure (str);
-	}
-
-	planApproved ()
-	{
-		this._confirmationDialog.render (false);
-	}
-
-	planRejected ()
-	{
-		this._confirmationDialog.render (false);
 	}
 
 	inCombat () { return this.token.inCombat; }

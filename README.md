@@ -29,7 +29,7 @@ When a hotkey is pressed ('g', for [g]o), mookAI takes the turn for the active t
   * Additional information will be provided in a future release
   * If the user rejects the plan, mookAI aborts, the token doesn't move any further, and the turn does not advance
 * If accepted, the mook will automatically move along the projected path, attack, and end their turn
-  * mookAI will automatically use one of midi-qol, minor-qol, BetterRolls5e, or the default roller, in that order
+  * mookAI will automatically use BetterRolls5e, if present
 
 ![Move respect vision](https://media2.giphy.com/media/ZhIknG0j4RlOa30Qsi/giphy.gif)
 
