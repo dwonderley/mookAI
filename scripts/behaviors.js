@@ -140,9 +140,6 @@ export class Behaviors
 
 		let targetNum = Math.floor (Math.random () * numTargets);
 
-		if (targetNum < 2)
-			console.log (targetNum);
-
 		if (mm.hasMele)
 		{
 			if (targets_.mele.length > targetNum)

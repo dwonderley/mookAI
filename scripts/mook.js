@@ -396,15 +396,8 @@ export class Mook
 
 	async move (segment_)
 	{
-		console.log ("trying segment: ");
-		console.log (segment_.point);
-		console.log ("from");
-		console.log (this.segment.point);
 		if (! this.utility.isTraversable (this.segment, segment_))
-		{
-			console.log ("failed");
 			return false;
-		}
 
 		let error = false;
 
@@ -432,7 +425,6 @@ export class Mook
 		});
 		for (let angle of angles)
 		{
-			console.log ("\nAngle: %f", angle);
 			let success = await this.move (this.segment.neighbor (angle, this.rotation));
 			if (success) return true;
 		}
