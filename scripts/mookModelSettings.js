@@ -30,6 +30,8 @@ export class MookModelSettings
 		const actor = token_.actor;
 
 		this.mookType = MookTypes[settingIndexToString ("mookAI.MookType", "MookType")];
+		if (! this.mookType)
+			this.mookType = MookTypes.SHIA;
 
 		// false indicates "do not automate this token"
 		// todo: default false when actor-level configuration is available
@@ -50,11 +52,11 @@ export class MookModelSettings
 		if (this.rotationCost > 1) this.rotationCost = 1;
 
 		// todo: When I get configuration working, mooks won't attack members of the same faction (probably checking for substrings: a goblin cultist might not attack other goblins or other cultists). Right now, mooks only attack PCs.
+		this.faction = "hostile";
 		// An override to the above. Some tokens, such as light sources, vehicles, etc. should not be attacked.
 		// false indicates "mooks should not attack this token"
 		// todo: default false when configuration works
 		this.attackable = "true";
-		this.faction = "hostile";
 
 		// The max weapon distance, in tiles, if not provided by a weapon
 		this.standardMeleWeaponTileRange = game.settings.get ("mookAI", "StandardMeleTileRange");

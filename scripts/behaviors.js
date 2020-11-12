@@ -69,6 +69,10 @@ export class Behaviors
 			return Behaviors.surprise (mook_, targets_);
 		case (MookTypes.VEGETA):
 			return Behaviors.attackByCurrentHealth (mook_, targets_, true);
+		default:
+			console.log ("mookAI | Unsupported mook type!");
+			mook_.settings.mookType = MookTypes.SHIA;
+			return Behaviors.surprise (mook_, targets_);
 		}
 
 		throw "Failed to select a target";
