@@ -42,7 +42,7 @@ export class Mook
 			collisionConfig: { checkCollision: true, token: token_ }
 		});
 
-		this.debug = true;
+		this.debug = false;
 	}
 
 	startTurn ()
