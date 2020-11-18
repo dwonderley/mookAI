@@ -451,7 +451,12 @@ class MookModel5e extends MookModel
 	// todo: evaluate units
 	get time ()
 	{
-		return parseInt (this.token.actor.data.data.attributes.movement.walk, 10) / this.gridDistance;
+		let speed = parseInt (this.token.actor.data.data.attributes.movement.walk, 10);
+		
+		if (! speed)
+			speed = 30;
+
+		return speed / this.gridDistance;
 	}
 	get zoomsPerTurn ()
 	{
