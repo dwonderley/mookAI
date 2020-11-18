@@ -1,6 +1,6 @@
 import { Abort, Mook } from "./mook.js"
-import { MinkowskiParameter } from "/modules/lib-find-the-path/scripts/point.js";
-import { FTPUtility } from "/modules/lib-find-the-path/scripts/utility.js";
+import { MinkowskiParameter } from "../../lib-find-the-path/scripts/point.js";
+import { FTPUtility } from "../../lib-find-the-path/scripts/utility.js";
 
 let mookAI;
 

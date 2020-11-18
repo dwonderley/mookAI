@@ -1,8 +1,8 @@
 import { Behaviors, MookTypes, Target } from "./behaviors.js"
 import { ActionType, MookModel } from "./mookModel.js";
-import { PathManager } from "/modules/lib-find-the-path/scripts/pathManager.js";
-import { PointFactory, SquareNeighborAngles, AngleTypes } from "/modules/lib-find-the-path/scripts/point.js";
-import { FTPUtility } from "/modules/lib-find-the-path/scripts/utility.js";
+import { PathManager } from "../../lib-find-the-path/scripts/pathManager.js";
+import { PointFactory, SquareNeighborAngles, AngleTypes } from "../../lib-find-the-path/scripts/point.js";
+import { FTPUtility } from "../../lib-find-the-path/scripts/utility.js";
 
 export class Abort extends Error
 {
