@@ -172,8 +172,6 @@ export class MookModel
 
 		return ret;
 	}
-	// Override this and exploreActions if you want your mooks to do something instead of wander around
-	explore (data_) { return; }
 	faceAction (token_) { return { actionType: ActionType.FACE, data: token_ }; }
 	meleAttackAction () { return { actionType: ActionType.ATTACK, data: { weapon: this.meleWeapon }}; }
 	rangedAttackAction () { return { actionType: ActionType.ATTACK, data: { weapon: this.rangedWeapon }}; }

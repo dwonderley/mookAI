@@ -54,6 +54,8 @@ export class Mook
 		this._start = this._pointFactory.segmentFromToken (this.token);
 		this._segment = this._start;
 
+		this._isExplorer = this.isExplorer;
+
 		this.time = this.mookModel.time;
 		this._visibleTargets.splice (0);
 	}
@@ -98,9 +100,7 @@ export class Mook
 				return;
 			}
 
-			this.mookModel.exploreActions ().forEach (a => {
-				this.plan.push (a);
-			});
+			this.plan.push ({ actionType: ActionType.EXPLORE });
 			this.plan.push (this.mookModel.senseAction ());
 			this.plan.push (this.mookModel.planAction ());
 			return;
@@ -126,9 +126,7 @@ export class Mook
 			}
 
 			// If a mook can't find a target, they will explore to try to find one
-			this.mookModel.exploreActions ().forEach (a => {
-				this.plan.push (a);
-			});
+			this.plan.push ({ actionType: ActionType.EXPLORE });
 			this.plan.push (this.mookModel.senseAction ());
 			this.plan.push (this.mookModel.planAction ());
 			return;
@@ -230,8 +228,50 @@ export class Mook
 			// todo? Find a use for this
 			// Open doors?
 			case (ActionType.EXPLORE):
+				if (this.isExploreDisabled)
+					this.handleFailure (new Abort ("Not taking turn. Mook found no targets and exploration is disabled."));
+
 				if (this.debug) console.log ("Exploring!?");
-				this.mookModel.explore (action.data);
+
+				if (! this._isExplorer)
+				{
+					let dialogPromise = new Promise ((resolve, reject) => {
+						const dialog = new Dialog ({
+							title: "Mook wants to explore!",
+							content: "<p>The mook could not find a target. This could be because they don't have vision on a PC or because they are outside of weapon range.</p><p>The mook can explore their environment and try to find a target. Otherwise, mookAI will return control to the user.</p>",
+							buttons: {
+								approve: {
+									label: game.i18n.localize ("Explore"),
+									callback: () => { resolve (); }
+								},
+								reject: {
+									label: game.i18n.localize ("Assume Direct Control"),
+									callback: () => { reject (); }
+								}
+							},
+							default: "approve",
+							close: reject
+						});
+	
+						dialog.render (true);
+						dialog.position.top = 120;
+						dialog.position.left = 120;
+					});
+
+					try {
+						await dialogPromise;
+					}
+					catch (error)
+					{
+						this.handleFailure (new Abort ("Mook not exploring; out of actions."));
+					}
+
+					this._isExplorer = true;
+				}
+
+				const exploreActions = this.mookModel.exploreActions ();
+				for (let i = 0; i < exploreActions.length; ++i)
+					this.plan.splice (i, 0, exploreActions[i]);
 				break;
 			case (ActionType.TARGET):
 				if (this.debug) console.log ("Targeting");
@@ -443,6 +483,18 @@ export class Mook
 	{
 		this._targetedTokens.push (token_);
 		token_.setTarget (true, { releaseOthers: true, groupSelection: false });
+	}
+
+	get isExploreDisabled ()
+	{
+		const ret = game.settings.get ("mookAI", "DisableExploration");
+		return (typeof ret === "boolean") ? ret : false;
+	}
+
+	get isExplorer ()
+	{
+		const ret = game.settings.get ("mookAI", "ExploreAutomatically");
+		return (typeof ret === "boolean") ? ret : false;
 	}
 
 	get neighborAngles () { return Object.values (SquareNeighborAngles); }

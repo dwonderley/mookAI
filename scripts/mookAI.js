@@ -70,6 +70,24 @@ export function initAI ()
 		choices: ["DO_NOTHING", "ROTATE", "CREEP", "WANDER"],
 	});
 
+	game.settings.register ("mookAI", "DisableExploration", {
+		name: "Mooks will not explore",
+		hint: "If a mook cannot find a target, mookAI will stop without ending the turn.",
+		scope: "world",
+		config: true,
+		default: false,
+		type: Boolean
+	});
+
+	game.settings.register ("mookAI", "ExploreAutomatically", {
+		name: "Mooks explore automatically",
+		hint: "If a mook cannot find a target, they will explore their environment without being directed.",
+		scope: "world",
+		config: true,
+		default: true,
+		type: Boolean
+	});
+
 	game.settings.register ("mookAI", "RotationCost", {
 		name: "Rotation Cost",
 		hint: "When exploring, mooks may end up rotating to search for heroes to die against. This setting controls how much movement, in tiles, each rotation costs. It can be set between 0.0 and 1.0 tiles unless the mook's initiative is set to \"Rotate.\" If the mook is configured to rotate, and the rotation cost is 0.0, then they will \"Do Nothing\" instead.",
@@ -134,7 +152,7 @@ export class MookAI
 		if (! game.user.isGM)
 		{
 			// todo?: let heroes have mooks
-			console.log ("mookAI | Heroes don't have mooks!");
+			console.log ("mookAI | Heroes don't have mooks; they have friends!");
 			return false;
 		}
 
@@ -344,6 +362,10 @@ export class MookAI
 			{
 				console.error ("mookAI | Encountered unrecoverable error:");
 				console.error (e);
+			}
+			else
+			{
+				console.log ("mookAI | " + e);
 			}
 
 			this._busy = false;
