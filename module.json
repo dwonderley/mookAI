@@ -5,7 +5,7 @@
   "author": "Dave Of Wonders",
   "version": "0.1.3",
   "minimumCoreVersion": "0.7.6",
-  "compatibleCoreVersion": "0.7.7",
+  "compatibleCoreVersion": "0.7.8",
   "dependencies": [
     {
       "name": "lib-find-the-path"

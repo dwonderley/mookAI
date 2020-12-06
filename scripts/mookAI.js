@@ -79,6 +79,15 @@ export function initAI ()
 		type: Boolean
 	});
 
+	game.settings.register ("mookAI", "DisableRotation", {
+		name: "Tokens will not rotate",
+		hint: "If checked, mookAI will enable \"Lock Rotation\" in a token's settings before moving a mook. Afterward, it will return that setting to its initial value.",
+		scope: "world",
+		config: true,
+		default: false,
+		type: Boolean
+	});
+
 	game.settings.register ("mookAI", "ExploreAutomatically", {
 		name: "Mooks explore automatically",
 		hint: "If a mook cannot find a target, they will explore their environment without being directed.",
@@ -323,6 +332,8 @@ export class MookAI
 
 	async takeTurn ()
 	{
+		let mook;
+
 		try
 		{
 			// Throws if there is not combat on the *active* scene
@@ -331,27 +342,21 @@ export class MookAI
 
 			this.applySettings ();
 
-			const mook = this.getMook (game.combat.current.tokenId);
+			mook = this.getMook (game.combat.current.tokenId);
 	
 			if (! mook)
 			{
-				ui.notifications.warn ("mookAI | Mook not found. Are you viewing the active scene?");
-				throw "Failed to find mook " + game.combat.current.tokenId + " in scene " + game.scenes.active.id;
-			}
-	
-			if (mook.token.actor.hasPlayerOwner)
-			{
-				console.log ("mookAI | Not taking turn for player character");
-				return;
+				ui.notifications.warn ("mookAI | Mook not found in scene. Please verify that the current scene is active.");
+				throw "Failed to find mook (id: " + game.combat.current.tokenId + ") in scene (id: " + game.scenes.active.id + "). The most likely cause is that you are viewing an inactive scene. Please activate the scene before using mookAI. If the scene is already active, please submit a bug report!";
 			}
 	
 			this._busy = true;
 	
-			mook.startTurn ();
+			await mook.startTurn ();
 			await mook.sense ();
 			mook.planTurn ();
 			await mook.act ();
-			mook.releaseControl ();
+			await mook.endTurn ();
 			this.endTurn ();
 	
 			this._busy = false;
@@ -368,6 +373,7 @@ export class MookAI
 				console.log ("mookAI | " + e);
 			}
 
+			if (mook) await mook.cleanup ();
 			this._busy = false;
 		}
 	}
