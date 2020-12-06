@@ -26,9 +26,10 @@ export class Mook
 		// Manages the mook's attempts at path planning
 		this._pathManager = new PathManager (metric_);
 
+		this._disabledRotation = false;
+		this._mookModel = MookModel.getMookModel (token_);
 		this._start = this._pointFactory.segmentFromToken (token_);
 		this._segment = this._start;
-		this._mookModel = MookModel.getMookModel (token_);
 		this._targetedTokens = new Array ();
 		this._visibleTargets = new Array ();
 		// "time" represents how much a mook can do on their turn. Moving a tile costs 1 time unit by default.
@@ -42,10 +43,11 @@ export class Mook
 			collisionConfig: { checkCollision: true, token: token_ }
 		});
 
+		this.pcWarning = "<p style=\"color:red\">Warning: Token is owned by a player!</p>";
 		this.debug = false;
 	}
 
-	startTurn ()
+	async startTurn ()
 	{
 		// Need to take control in order to check token's vision
 		this.takeControl ();
@@ -58,6 +60,9 @@ export class Mook
 
 		this.time = this.mookModel.time;
 		this._visibleTargets.splice (0);
+
+		if (this.rotationDisabled)
+			await this.lockRotation ();
 	}
 
 	async sense ()
@@ -235,10 +240,15 @@ export class Mook
 
 				if (! this._isExplorer)
 				{
+					let dialogContent = "<p>The mook could not find a target. This could be because they don't have vision on a PC or because they are outside of weapon range.</p><p>The mook can explore their environment and try to find a target. Otherwise, mookAI will return control to the user.</p>";
+
+					if (this.token.actor.hasPlayerOwner)
+						dialogContent = this.pcWarning + dialogContent;
+
 					let dialogPromise = new Promise ((resolve, reject) => {
 						const dialog = new Dialog ({
 							title: "Mook wants to explore!",
-							content: "<p>The mook could not find a target. This could be because they don't have vision on a PC or because they are outside of weapon range.</p><p>The mook can explore their environment and try to find a target. Otherwise, mookAI will return control to the user.</p>",
+							content: dialogContent,
 							buttons: {
 								approve: {
 									label: game.i18n.localize ("Explore"),
@@ -295,10 +305,15 @@ export class Mook
 					this.utility.highlightPoints (action.data.path.path.map (s => s.origin));
 				}
 
+				let dialogContent = "<p>Take action?</p>";
+
+				if (this.token.actor.hasPlayerOwner)
+					dialogContent = this.pcWarning + dialogContent;
+	
 				let dialogPromise = new Promise ((resolve, reject) => {
 					const dialog = new Dialog ({
 						title: "Confirm Mook Action",
-						content: "<p>Take action?</p>",
+						content: dialogContent,
 						buttons: {
 							approve: {
 								label: game.i18n.localize ("Approve"),
@@ -358,19 +373,18 @@ export class Mook
 		this.segment.update (changes_);
 	}
 
-	cleanup ()
+	async cleanup ()
 	{
+		// todo: Undo all actions
 		this.utility.clearHighlights ();
 		this.clearTargets ();
-		this.releaseControl ();
+		await this.endTurn ();
 	}
 
 	// Mooks don't have the emotional intelligence to handle failure :(
 	// todo: teach mooks how to love themselves
 	handleFailure (error_)
 	{
-		// todo: Undo all actions
-		this.cleanup ();
 		throw error_;
 	}
 
@@ -390,6 +404,12 @@ export class Mook
 	// Expects degrees
 	async rotate (dTheta_)
 	{
+		if (dTheta_ === null || dTheta_ === undefined || dTheta_ === NaN)
+		{
+			console.error ("mookAI | Attempted invalid rotation");
+			return;
+		}
+
 		await this.token.update ({ rotation: (this.rotation + dTheta_) % 360 });
 		await new Promise (resolve => setTimeout (resolve, this.rotationDelay));
 	}
@@ -463,13 +483,39 @@ export class Mook
 		return false;
 	}
 
+	async endTurn ()
+	{
+		if (this.rotationDisabled)
+			await this.unlockRotation ();
+
+		this.releaseControl ();
+	}
+
 	isTargetReachable (target_, attackRange_)
 	{
 		return this.pathManager.path (this.token.id, target_.id).terminalDistanceToDest <= attackRange_;
 	}
 
-	takeControl () { this.token.control ({}); }
+	async lockRotation ()
+	{
+		if (this.tokenLocked === true)
+			return;
+
+		await this.token.update ({ lockRotation: true });
+		this._disabledRotation = true;
+	}
+
+	async unlockRotation ()
+	{
+		if (! this._disabledRotation)
+			return;
+
+		await this.token.update ({ lockRotation: false });
+		this._disabledRotation = false;
+	}
+
 	releaseControl () { this.token.release ({}); }
+	takeControl () { this.token.control ({}); }
 
 	clearTargets ()
 	{
@@ -531,6 +577,8 @@ export class Mook
 	set time (speed_) { this._time = speed_; }
 
 	get token () { return this._token; }
+
+	get tokenLocked () { token.data.lockRotation; }
 
 	get visibleTargets () { return this._visibleTargets; }
 }
