@@ -38,9 +38,15 @@ export class Mook
 		// Array of Actions
 		this._plan = new Array ();
 
+		this._collisionConfig = { checkCollision: true, whitelist: new Array (token_) };
+		this._pathManagerConfig = { 
+			collision: this._collisionConfig,
+			priorityMeasure: null,
+			constrainVision: true
+		};
 		this.utility= new FTPUtility ({
 			token: token_,
-			collisionConfig: { checkCollision: true, token: token_ }
+			collisionConfig: this._collisionConfig
 		});
 
 		this.pcWarning = "<p style=\"color:red\">Warning: Token is owned by a player!</p>";
@@ -89,7 +95,7 @@ export class Mook
 
 		// Todo: compute paths between tokens when one moves and then select paths here. 
 		for (let t of this.visibleTargets)
-			await this.pathManager.addToken (this.token, t, this.time);
+			await this.pathManager.addToken (this.token, t, this.time, this.pathManagerConfig);
 	}
 
 	planTurn ()
@@ -556,6 +562,11 @@ export class Mook
 	}
 
 	get pathManager () { return this._pathManager; } 
+	get pathManagerConfig ()
+	{
+		this._pathManagerConfig.constrainVision = ! game.settings.get ("mookAI", "MookOmniscience");
+		return this._pathManagerConfig;
+	} 
 
 	get plan () { return this._plan; }
 

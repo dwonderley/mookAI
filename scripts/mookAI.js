@@ -60,6 +60,15 @@ export function initAI ()
 		type: Boolean,
 	});
 
+	game.settings.register ("mookAI", "MookOmniscience", {
+		name: "Mook Omniscience",
+		hint: "If enabled, mooks will always find the most direct path to a target, even if the path itself is obscured or otherwise hard to navigate. If disabled, the path a mook takes can only consist of tiles the mook could see before the mook started moving. For example, an omniscient mook could perfectly navigate a maze if they had vision on a target from the initial position.",
+		scope: "world",
+		config: true,
+		default: true,
+		type: Boolean,
+	});
+
 	game.settings.register ("mookAI", "MookInitiative", {
 		name: "Mook Initiative",
 		hint: "Controls what mooks do when there is no target within range. They can do nothing, rotate in place, creep forward 1 tile at a time, or wander aimlessly (rotate + creep). If they find an enemy while \"exploring\" that is in range (after accounting for how far they have already moved), they will attack that target according to their configured behavior. In either case, they will pass their turn in combat afterward.",
