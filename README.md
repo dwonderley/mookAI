@@ -4,7 +4,8 @@ mookAI provides combat automation for low-utility NPCs.
 The mook is a creature characterizied by their lack of ambition: they must be told where to go, what to do, and when to do it. This module automates those decisions, freeing you of managing their doomed efforts. In effect, this tool is primarily a time-saving device: it shifts the burden of attention, freeing the GM to spend more time playing the villian(s) without dominating combat activity. For example, the GM could use mookAI to take several NPC turns in just a few seconds while describing all of the mooks' actions as though they had happend simultaneously, as below.
 
 ![Move mooks quickly](https://media2.giphy.com/media/XC6wbezvTHa264E03K/giphy.gif)
-![Now with multi-automation](https://imgur.com/a/XhPD0Ds)
+
+<a href='https://imgur.com/a/XhPD0Ds'>Now with multi-token automation!</a>
 
 ## How does it work?
 When a hotkey is pressed ('g', for [g]o), mookAI takes the turn for the active token in the turn order*. This process consists of the following steps:
