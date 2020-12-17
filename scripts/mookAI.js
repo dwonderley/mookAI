@@ -51,6 +51,15 @@ export function initAI ()
 		choices: ["EAGER_BEAVER", "SHIA"],
 	});
 
+	game.settings.register ("mookAI", "AutoEndTurn", {
+		name: "Automatically End Turn",
+		hint: "If enabled, mookAI will advance the combat tracker after a mook acts. Otherwise, it will not.",
+		scope: "world",
+		config: true,
+		default: true,
+		type: Boolean,
+	});
+
 	game.settings.register ("mookAI", "UseVision", {
 		name: "Use Vision",
 		hint: "If enabled, mooks will only attack enemies their tokens can see. If disabled, mooks have omniscient: they have full knowledge of the location of all tokens and the optimal path around/through all obstacles (such as mazes). Make sure that token vision is enabled and configured!",
@@ -237,10 +246,17 @@ export class MookAI
 		if (game.modules.get("lib-find-the-path")?.active)
 		{
 			document.addEventListener('keyup', evt => {
-				if (evt.key !== 'g' || ! evt.target.classList.contains ("game") || this.busy)
+				if (evt.key.toLowerCase () !== 'g' || ! evt.target.classList.contains ("game") || this.busy)
 					return;
 	
-				this.takeTurn ();
+				if (evt.shiftKey)
+					this.takeControlledTurns ();
+				else if (evt.ctrlKey)
+					this.takeNextTurn ();
+				else if (evt.altKey)
+					this.takeNextTurn ();
+				else
+					this.takeNextTurn ();
 			});
 		}
 		else
@@ -264,7 +280,9 @@ export class MookAI
 	
 	addCombatant (combatId_, id_)
 	{
-		this.combats.get (combatId_).set (id_, new Mook (canvas.tokens.get (id_), this.metric));
+		const mook = new Mook (canvas.tokens.get (id_), this.metric);
+		this.combats.get (combatId_).set (id_, mook);
+		return mook;
 	}
 
 	deleteCombatant (combat_, id_)
@@ -324,36 +342,61 @@ export class MookAI
 
 	async endTurn ()
 	{
+		if (! this.autoEndTurn)
+			return;
+
 		return await game.combat.nextTurn ().catch (err => {
 			ui.notifications.warn (err);
 		});
 	}
 
-	getMook (id_)
+	getCombat ()
 	{
-		const combat = this.combats.get (game.combat.id);
-
-		if (! combat)
-			return undefined;
-
-		return combat.get (id_);
+		return this.combats.get (game.combat.id);
 	}
 
-	async takeTurn ()
+	getMook (combat_, tokenId_)
 	{
-		let mook;
+		if (! combat_)
+			throw "Invalid combat"
 
+		if (! combat_.has (tokenId_))
+			return this.addCombatant (game.combat.id, tokenId_);
+
+		return combat_.get (tokenId_);
+	}
+
+	async takeNextTurn ()
+	{
+		this.applySettings ();
+
+		// Throws if there is not combat on the *active* scene
+		if (this._combats.size === 0)
+			await this.startCombats ();
+
+		let success = await this.takeMookTurn (this.getMook (this.getCombat (), game.combat.current.tokenId));
+
+		if (success)
+			this.endTurn ();
+	}
+
+	// Takes a turn for all selected tokens regardless of initiative
+	async takeControlledTurns ()
+	{
+		this.applySettings ();
+
+		if (this._combats.size === 0)
+			await this.startCombats ();
+
+		for (let token of canvas.tokens.controlled)
+			await this.takeMookTurn (this.getMook (this.getCombat (), token.id));
+	}
+
+	async takeMookTurn (mook_)
+	{
 		try
 		{
-			// Throws if there is not combat on the *active* scene
-			if (this._combats.size === 0)
-				await this.startCombats ();
-
-			this.applySettings ();
-
-			mook = this.getMook (game.combat.current.tokenId);
-	
-			if (! mook)
+			if (! mook_)
 			{
 				ui.notifications.warn ("mookAI | Mook not found in scene. Please verify that the current scene is active.");
 				throw "Failed to find mook (id: " + game.combat.current.tokenId + ") in scene (id: " + game.scenes.active.id + "). The most likely cause is that you are viewing an inactive scene. Please activate the scene before using mookAI. If the scene is already active, please submit a bug report!";
@@ -361,14 +404,14 @@ export class MookAI
 	
 			this._busy = true;
 	
-			await mook.startTurn ();
-			await mook.sense ();
-			mook.planTurn ();
-			await mook.act ();
-			await mook.endTurn ();
-			this.endTurn ();
+			await mook_.startTurn ();
+			await mook_.sense ();
+			mook_.planTurn ();
+			await mook_.act ();
+			await mook_.endTurn ();
 	
 			this._busy = false;
+			return true;
 		}
 		catch (e)
 		{
@@ -382,8 +425,9 @@ export class MookAI
 				console.log ("mookAI | " + e);
 			}
 
-			if (mook) await mook.cleanup ();
+			if (mook_) await mook_.cleanup ();
 			this._busy = false;
+			return false;
 		}
 	}
 
@@ -414,6 +458,8 @@ export class MookAI
 			mooks.forEach (m => { m.handleTokenUpdate (changes_); });
 		});
 	}
+
+	get autoEndTurn () { return game.settings.get ("mookAI", "AutoEndTurn"); }
 
 	// ;)
 	get busy () { return this._busy; }
