@@ -523,7 +523,7 @@ export class Mook
 	releaseControl () { this.token.release ({}); }
 	takeControl () { this.token.control ({}); }
 
-	clearTargets ()
+	// clearTargets ()
 	{
 		for (const t of this._targetedTokens)
 			t.setTarget (false, { releaseOthers: true, groupSelection: false });
