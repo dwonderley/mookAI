@@ -4,28 +4,28 @@
 export const MookTypes = Object.freeze ({
 	// Uses mele attacks first, attacks closest
 	EAGER_BEAVER: 1,
-	// Uses ranged attacks first, attacks furthest
+	// Uses ranged attacks first, minimizes movement, attacks furtherst
 	WARY_GARY: 2,
 	// Attacks character with lowest health
-	NELSON: 3,
+	NERVOUS_NELSON: 3,
 	// Attacks previous target, otherwise attacks closest
-	CARL: 4,
+	PERSISTENT_PAUL: 4,
 	// Attacks a random target in range
-	SHIA: 5,
+	SHIA_SURPRISE: 5,
 	// Attacks last token to attack mook
-	OLIVIA: 6,
+	REPRISING_OLIVIA: 6,
 	// Attacks first token to attack mook
-	CANDICE: 7,
+	VENGEFUL_CANDICE: 7,
 	// Attacks bigest source of personal damage
 	// Attacks bigest source of total damage
 	// Attacks token that last defeated an ally
 	// Attacks token that has defeated the most allies
-	MICHAEL: 12,
+	AVENGING_MICHAEL: 12,
 	// Pack tactics
-	A_REALLY_GOOD_DOG: 13,
+	GOOD_BOI: 13,
 	// Attacks next in turn order
-	ALLISON: 14,
-	
+	ANALYTICAL_ALLISON: 14,
+
 	// Secret GM tech (don't use too many of these, or they'll catch on):
 	// Attacks healthiest
 	VEGETA: 9001,

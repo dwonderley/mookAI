@@ -21,6 +21,9 @@ export class Mook
 	{
 		this._token = token_;
 
+		if (! this._token)
+			throw new Abort(`Token with id ${token_.id} was not found`);
+
 		// Used to create Point objects
 		this._pointFactory = new PointFactory (metric_);
 		// Manages the mook's attempts at path planning
@@ -76,10 +79,11 @@ export class Mook
 		this.pathManager.clearAll ();
 
 		this._visibleTargets = game.combat.combatants.filter (combatant => {
+			const id = combatant.data.tokenId;
 			// Even mooks won't target themselves on purpose
-			if (combatant.tokenId === this.token.id) return false;
+			if (id === this.token.id) return false;
 
-			const token = canvas.tokens.get (combatant.tokenId);
+			const token = canvas.tokens.get (id);
 
 			// todo: add "factions" to allow targeting of npcs
 			if (! this.isPC (token)) return false;
@@ -91,7 +95,7 @@ export class Mook
 			if (this.mookModel.hasVision && ! this.canSee (token.id)) return false;
 
 			return true;
-		}).map (c => { return canvas.tokens.get (c.tokenId); });
+		}).map (c => { return canvas.tokens.get (c.data.tokenId); });
 
 		// Todo: compute paths between tokens when one moves and then select paths here. 
 		for (let t of this.visibleTargets)
@@ -233,16 +237,14 @@ export class Mook
 			case (ActionType.MOVE):
 				if (this.debug)
 					console.log ("Moving from (%f, %f) to (%f, %f)",
-						     this.point.x, this.point.y, action.data.x, action.data.y);
+								this.point.x, this.point.y, action.data.x, action.data.y);
 				await this.move (action.data);
 				break;
-			// todo? Find a use for this
-			// Open doors?
 			case (ActionType.EXPLORE):
 				if (this.isExploreDisabled)
 					this.handleFailure (new Abort ("Not taking turn. Mook found no targets and exploration is disabled."));
 
-				if (this.debug) console.log ("Exploring!?");
+				if (this.debug) console.log ("Exploring");
 
 				if (! this._isExplorer)
 				{
@@ -358,7 +360,7 @@ export class Mook
 			this.time -= action.cost ? action.cost : 0;
 		}
 
-		let str = "Unknown failure";
+		let str = "mookAI | Unknown failure";
 
 		if (tries <= 0)
 			str = "mookAI | Planning failure: forced exit after too many loops.";
@@ -416,7 +418,7 @@ export class Mook
 			return;
 		}
 
-		await this.token.update ({ rotation: (this.rotation + dTheta_) % 360 });
+		await this.tokenDoc.update ({ rotation: (this.rotation + dTheta_) % 360 });
 		await new Promise (resolve => setTimeout (resolve, this.rotationDelay));
 	}
 
@@ -459,7 +461,7 @@ export class Mook
 		let error = false;
 
 		await this.rotate (this.segment.radialDistToSegment (segment_, this.token.data.rotation, AngleTypes.DEG));
-		await this.token.update ({ x: segment_.point.px, y: segment_.point.py }).catch (err => {
+		await this.tokenDoc.update ({ x: segment_.point.px, y: segment_.point.py }).catch (err => {
 			ui.notifications.warn (err);
 			error = true;
 		});
@@ -507,7 +509,7 @@ export class Mook
 		if (this.tokenLocked === true)
 			return;
 
-		await this.token.update ({ lockRotation: true });
+		await this.tokenDoc.update ({ lockRotation: true });
 		this._disabledRotation = true;
 	}
 
@@ -516,7 +518,7 @@ export class Mook
 		if (! this._disabledRotation)
 			return;
 
-		await this.token.update ({ lockRotation: false });
+		await this.tokenDoc.update ({ lockRotation: false });
 		this._disabledRotation = false;
 	}
 
@@ -588,6 +590,7 @@ export class Mook
 	set time (speed_) { this._time = speed_; }
 
 	get token () { return this._token; }
+	get tokenDoc () { return game.scenes.active.tokens.get(this._token.id) }
 
 	get tokenLocked () { token.data.lockRotation; }
 

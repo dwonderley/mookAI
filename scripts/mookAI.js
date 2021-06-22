@@ -161,8 +161,16 @@ export function initAI ()
 	});
 
 	Hooks.on ("ready", () => {
-		if (! mookAI.ready ())
-			mookAI = {};
+		try
+		{
+			if (! mookAI.ready ())
+				mookAI = {};
+		}
+		catch (e_)
+		{
+			console.log ("mookAI | Failed to initialize:")
+			console.log (e_)
+		}
 	});
 }
 
@@ -183,23 +191,23 @@ export class MookAI
 			return false;
 		}
 
-		Hooks.on ("updateToken", (scene_, token_, changes_, diff_, sceneID_) => {
-			if (! diff_)
+		Hooks.on ("updateToken", (token_, changes_, diff_, sceneID_) => {
+			if (! diff_?.diff)
 				return;
 		
 			this.updateTokens (changes_);
 		});
 
-		Hooks.on ("createCombatant", (combat_, combatant_, obj_, id_) => {
-			this.addCombatant (combat_.id, combatant_.tokenId);
+		Hooks.on ("createCombatant", (combatant_, config_, id_) => {
+			this.addCombatant (id_, combatant_.data.tokenId);
 		});
-		Hooks.on ("deleteCombatant", (combat_, combatant_, obj_, id_) => {
-			this.deleteCombatant (combat_, combatant_.tokenId);
+		Hooks.on ("deleteCombatant", (combatant_, config_, id_) => {
+			this.deleteCombatant (id_, combatant_.data.tokenId);
 		});
-		Hooks.on ("createCombat", (combat_, obj_, id_) => {
+		Hooks.on ("createCombat", (combat_, config_, id_) => {
 			this.combatStart (combat_);
 		});
-		Hooks.on ("deleteCombat", (combat_, obj_, id_) => {
+		Hooks.on ("deleteCombat", (combat_, config_, id_) => {
 			this.combatEnd (combat_);
 		});
 		Hooks.on ("updateScene", (...args) => { this.handleSceneChange () });
@@ -317,13 +325,13 @@ export class MookAI
 
 		let newMooks = new Map ();
 
-		combat_.combatants.forEach (element => {
-			const newToken = canvas.tokens.get (element.tokenId);
+		combat_.combatants.forEach (combatant => {
+			const newToken = canvas.tokens.get (combatant.data.tokenId);
 
 			if (! newToken)
 			    return;
 
-			newMooks.set (element.tokenId, new Mook (newToken, this.metric));
+			newMooks.set (combatant.data.tokenId, new Mook (newToken, this.metric));
 		});
 
 		this._combats.set (combat_.id, newMooks);
