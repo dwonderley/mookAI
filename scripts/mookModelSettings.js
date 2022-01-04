@@ -1,4 +1,4 @@
-import { MookTypes } from "./behaviors.js"
+import { MookTypes, getMookType } from "./behaviors.js"
 import { Mook } from "./mook.js";
 
 // Controls what a mook does when their are no viable targets
@@ -29,9 +29,7 @@ export class MookModelSettings
 		// todo: Use the token's actor to access individualized mook settings
 		const actor = token_.actor;
 
-		this.mookType = MookTypes[settingIndexToString ("mookAI.MookType", "MookType")];
-		if (! this.mookType)
-			this.mookType = MookTypes.SHIA;
+		this.mookType = getMookType (game.settings.get ("mookAI", "MookType"));
 
 		// false indicates "do not automate this token"
 		// todo: default false when actor-level configuration is available

@@ -34,6 +34,14 @@ export const MookTypes = Object.freeze ({
 	// Attacks highest "armor"
 });
 
+export function getMookType (index_)
+{
+	if (index_ === 0)
+		return MookTypes.EAGER_BEAVER;
+
+	return MookTypes.SHIA_SURPRISE;
+}
+
 export class Target
 {
 	constructor (token_, range_, action_)
@@ -65,22 +73,22 @@ export class Behaviors
 			return Behaviors.attackByDistance (mook_, targets_, false);
 		case (MookTypes.NELSON):
 			return Behaviors.attackByCurrentHealth (mook_, targets_, false);
-		case (MookTypes.SHIA):
+		case (MookTypes.SHIA_SURPRISE):
 			return Behaviors.surprise (mook_, targets_);
 		case (MookTypes.VEGETA):
 			return Behaviors.attackByCurrentHealth (mook_, targets_, true);
 		default:
 			console.log ("mookAI | Unsupported mook type!");
-			mook_.settings.mookType = MookTypes.SHIA;
+			mook_.settings.mookType = MookTypes.SHIA_SURPRISE;
 			return Behaviors.surprise (mook_, targets_);
 		}
 
 		throw "Failed to select a target";
 	}
 
-	static attackByValue (mm_, targets_, evaluator_, min_)
+	static attackByValue (mm_, targets_, evaluator_, maximize_)
 	{
-		const comparator = min ? Behaviors.getLargest : Behaviors.getSmallest;
+		const comparator = maximize_ ? Behaviors.getLargest : Behaviors.getSmallest;
 
 		const meleToken = comparator (targets_.mele?.map (t => t.token), evaluator_);
 		const rangedToken = comparator (targets_.ranged?.map (t => t.token), evaluator_);
@@ -126,8 +134,8 @@ export class Behaviors
 
 	static attackByCurrentHealth (mook_, targets_, gmTech_)
 	{
-		const getHealth = mook_.mookModel.getCurrentHealth;
-		return attackByValue (mook_.mookModel, targets_, getHealth, gmTech_);
+		const getHealth = mook_.mookModel.getCurrentHealth.bind (mook_.mookModel);
+		return Behaviors.attackByValue (mook_.mookModel, targets_, getHealth, gmTech_);
 	}
 
 	static surprise (mook_, targets_)
